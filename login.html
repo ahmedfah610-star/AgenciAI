@@ -123,7 +123,7 @@ async function doLogin() {
   });
   const data = await resp.json();
   if (data.success) {
-    window.location.href = '/';
+    window.location.href = '/app';
   } else {
     errEl.textContent    = data.error || 'Błąd logowania';
     errEl.style.display  = 'block';
@@ -145,7 +145,7 @@ async function doRegister() {
   });
   const data = await resp.json();
   if (data.success) {
-    window.location.href = '/';
+    window.location.href = '/app';
   } else {
     errEl.textContent   = data.error || 'Błąd rejestracji';
     errEl.style.display = 'block';
