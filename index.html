@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WooAI — Product Agent</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f11;
+    --surface: #17171a;
+    --surface2: #1e1e23;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #e8e8ec;
+    --muted: #7c7c8a;
+    --accent: #7c6af7;
+    --accent2: #5e4fd6;
+    --green: #34d399;
+    --green-dim: rgba(52,211,153,0.12);
+    --red: #f87171;
+    --amber: #fbbf24;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* ─── Layout ─── */
+  .shell { display: flex; flex-direction: column; min-height: 100vh; }
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--surface);
+  }
+  .logo-mark {
+    width: 34px; height: 34px;
+    background: linear-gradient(135deg, var(--accent), #b06ef3);
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .logo-text { font-family: 'DM Serif Display', serif; font-size: 20px; letter-spacing: -0.3px; }
+  .logo-text span { color: var(--accent); font-style: italic; }
+  .header-badge {
+    margin-left: auto;
+    font-size: 11px;
+    background: var(--green-dim);
+    color: var(--green);
+    border: 1px solid rgba(52,211,153,0.2);
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+  }
+  main { display: grid; grid-template-columns: 1fr 1fr; flex: 1; gap: 0; }
+
+  /* ─── Panel ─── */
+  .panel { padding: 32px; border-right: 1px solid var(--border); overflow-y: auto; }
+  .panel:last-child { border-right: none; }
+  .panel-title {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-title::before {
+    content: '';
+    display: block;
+    width: 18px;
+    height: 1px;
+    background: var(--muted);
+  }
+
+  /* ─── Upload zone ─── */
+  .upload-zone {
+    border: 1.5px dashed var(--border2);
+    border-radius: 16px;
+    min-height: 160px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+    overflow: hidden;
+    background: var(--surface);
+    padding: 24px;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(124,106,247,0.05);
+  }
+  .upload-zone input[type=file] {
+    position: absolute; inset: 0;
+    opacity: 0; cursor: pointer;
+    width: 100%; height: 100%;
+  }
+  .upload-icon { font-size: 32px; opacity: 0.3; }
+  .upload-hint { color: var(--muted); font-size: 13px; text-align: center; }
+  .upload-hint strong { color: var(--text); font-weight: 500; display: block; margin-bottom: 4px; font-size: 15px; }
+
+  /* ─── Image grid ─── */
+  .image-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .image-thumb {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+  }
+  .image-thumb img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+  .image-thumb .thumb-badge {
+    position: absolute;
+    top: 6px; left: 6px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.3px;
+  }
+  .image-thumb .thumb-remove {
+    position: absolute;
+    top: 5px; right: 5px;
+    background: rgba(15,15,17,0.8);
+    border: none;
+    color: var(--red);
+    cursor: pointer;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    font-size: 14px;
+    line-height: 22px;
+    text-align: center;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .image-thumb:hover .thumb-remove { opacity: 1; }
+  .add-more-btn {
+    aspect-ratio: 1;
+    border-radius: 10px;
+    border: 1.5px dashed var(--border2);
+    background: var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--muted); font-size: 28px;
+    transition: all .15s; position: relative; overflow: hidden;
+  }
+  .add-more-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(124,106,247,0.05); }
+  .add-more-btn input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .image-count {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 8px;
+    text-align: center;
+  }
+  .image-count span { color: var(--accent); font-weight: 500; }
+
+  /* ─── Button ─── */
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 11px 22px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.18s;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    width: 100%;
+    justify-content: center;
+    margin-top: 16px;
+  }
+  .btn-primary:hover { background: var(--accent2); transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+  .btn-publish {
+    background: var(--green);
+    color: #0a1a12;
+    font-weight: 600;
+    width: 100%;
+    justify-content: center;
+    margin-top: 20px;
+  }
+  .btn-publish:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .btn-publish:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  /* ─── Status bar ─── */
+  .status-bar {
+    margin-top: 16px;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    display: none;
+    align-items: center;
+    gap: 10px;
+  }
+  .status-bar.loading { display: flex; background: rgba(124,106,247,0.1); border: 1px solid rgba(124,106,247,0.2); color: #b0a4f9; }
+  .status-bar.error   { display: flex; background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.2); color: var(--red); }
+  .status-bar.success { display: flex; background: var(--green-dim); border: 1px solid rgba(52,211,153,0.2); color: var(--green); }
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(124,106,247,0.3);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ─── Product form ─── */
+  .product-form { display: none; flex-direction: column; gap: 0; }
+  .product-form.visible { display: flex; }
+  .field { margin-bottom: 14px; }
+  label { font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 0.8px; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  input[type=text], input[type=number], textarea, select {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 9px;
+    padding: 10px 14px;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+    resize: vertical;
+  }
+  input[type=text]:focus, input[type=number]:focus, textarea:focus, select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124,106,247,0.12);
+  }
+  textarea { min-height: 90px; }
+
+  /* ─── Char counter ─── */
+  .field-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .char-counter { font-size: 11px; color: var(--muted); }
+  .char-counter.warn { color: var(--amber); }
+  .char-counter.good { color: var(--green); }
+
+  .tags-input {
+    display: flex; flex-wrap: wrap; gap: 6px; min-height: 42px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 9px;
+    padding: 8px 12px;
+    cursor: text;
+    align-items: center;
+  }
+  .tags-input:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,106,247,0.12); }
+  .tag-pill {
+    background: rgba(124,106,247,0.18);
+    border: 1px solid rgba(124,106,247,0.3);
+    color: #b0a4f9;
+    font-size: 12px;
+    padding: 2px 8px 2px 10px;
+    border-radius: 20px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .tag-pill button { background: none; border: none; color: inherit; cursor: pointer; padding: 0; opacity: 0.6; font-size: 14px; line-height: 1; }
+  .tag-pill button:hover { opacity: 1; }
+  #tag-input-field {
+    background: none; border: none; outline: none;
+    font-family: inherit; font-size: 13px; color: var(--text);
+    flex: 1; min-width: 80px;
+  }
+
+  .price-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* ─── Section divider ─── */
+  .section-divider {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--accent);
+    font-weight: 500;
+    margin: 18px 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(124,106,247,0.2);
+  }
+
+  /* ─── Features chips ─── */
+  .features-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  .feature-chip {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 12px;
+  }
+  .feature-chip .chip-key { color: var(--muted); }
+  .feature-chip .chip-val { color: var(--text); font-weight: 500; }
+
+  /* ─── Vision description ─── */
+  .vision-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.7;
+    margin-bottom: 16px;
+    display: none;
+  }
+  .vision-box.visible { display: block; }
+  .vision-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); margin-bottom: 6px; font-weight: 500; }
+
+  /* ─── SEO preview ─── */
+  .seo-preview {
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-top: 6px;
+    font-family: Arial, sans-serif;
+  }
+  .seo-preview .seo-url { font-size: 12px; color: #202124; margin-bottom: 2px; }
+  .seo-preview .seo-title-preview { font-size: 18px; color: #1a0dab; line-height: 1.3; margin-bottom: 4px; font-weight: normal; }
+  .seo-preview .seo-desc-preview { font-size: 13px; color: #4d5156; line-height: 1.5; }
+
+  /* ─── Empty state ─── */
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100%; min-height: 300px;
+    color: var(--muted); text-align: center; gap: 10px;
+  }
+  .empty-state .big-icon { font-size: 48px; opacity: 0.15; }
+  .empty-state p { font-size: 13px; max-width: 220px; }
+
+  /* ─── Publish result ─── */
+  .publish-result {
+    margin-top: 16px;
+    border-radius: 10px;
+    padding: 16px;
+    background: var(--green-dim);
+    border: 1px solid rgba(52,211,153,0.25);
+    display: none;
+  }
+  .publish-result.visible { display: block; }
+  .publish-result h4 { color: var(--green); font-size: 14px; margin-bottom: 8px; }
+  .publish-result a { color: var(--green); font-size: 13px; text-decoration: underline; }
+
+  /* ─── Platform result rows ─── */
+  .platform-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-size: 13px;
+  }
+  .platform-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .platform-icon { font-size: 18px; flex-shrink: 0; }
+  .platform-name { font-weight: 600; color: var(--text); min-width: 110px; }
+  .platform-status-ok   { color: var(--green); }
+  .platform-status-err  { color: var(--red); font-size: 12px; }
+  .platform-link { color: var(--green); text-decoration: underline; font-size: 12px; }
+
+  /* ─── Allegro auth card ─── */
+  .allegro-card {
+    margin-top: 20px;
+    padding: 14px 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .allegro-card-header {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px;
+    color: var(--muted); font-weight: 500; margin-bottom: 10px;
+  }
+  .allegro-status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--red); flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .allegro-status-dot.ok { background: var(--green); }
+  .allegro-status-label { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+
+  /* ─── Header user controls ─── */
+  .header-user { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .btn-header {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 8px; font-family: inherit; font-size: 13px;
+    font-weight: 500; cursor: pointer; border: 1px solid var(--border2);
+    background: var(--surface2); color: var(--muted); transition: all .15s;
+  }
+  .btn-header:hover { color: var(--text); border-color: var(--accent); }
+
+  /* ─── Settings modal ─── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7);
+    z-index: 1000; align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border2); border-radius: 20px;
+    padding: 36px; width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto;
+  }
+  .modal h2 { font-family: 'DM Serif Display', serif; font-size: 20px; margin-bottom: 24px; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-top: 16px; user-select: none; }
+  details summary:hover { color: var(--text); }
+  details[open] summary { color: var(--accent); }
+  .modal-section { font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--accent); font-weight: 500; margin: 20px 0 12px; }
+  .modal label { font-size: 11px; font-weight: 500; color: var(--muted);
+    letter-spacing: .8px; text-transform: uppercase; display: block; margin-bottom: 6px; margin-top: 12px; }
+  .modal input[type=text], .modal input[type=url], .modal input[type=password] {
+    width: 100%; padding: 10px 14px; background: #0f0f11; border: 1px solid var(--border2);
+    border-radius: 9px; color: var(--text); font-size: 14px; font-family: inherit;
+    transition: border-color .15s; outline: none;
+  }
+  .modal input:focus { border-color: var(--accent); }
+  .modal-actions { display: flex; gap: 10px; margin-top: 24px; }
+  .btn-save { flex: 1; padding: 11px; background: var(--accent); color: #fff; border: none;
+    border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; }
+  .btn-save:hover { background: var(--accent2); }
+  .btn-cancel { padding: 11px 20px; background: none; border: 1px solid var(--border2);
+    border-radius: 10px; color: var(--muted); cursor: pointer; font-family: inherit; font-size: 14px; }
+  .btn-cancel:hover { border-color: var(--text); color: var(--text); }
+  .settings-msg { font-size: 13px; margin-top: 12px; display: none; }
+  .settings-msg.ok  { color: var(--green); display: block; }
+  .settings-msg.err { color: var(--red);   display: block; }
+
+  /* Device code box */
+  .device-code-box {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    font-size: 13px;
+  }
+  .device-code-box.visible { display: block; }
+  .device-code-val {
+    font-size: 22px; font-weight: 700; letter-spacing: 3px;
+    color: var(--accent); text-align: center; margin: 6px 0 8px;
+  }
+  .device-code-link { color: var(--accent); text-decoration: underline; font-size: 12px; }
+
+  /* Publish target toggles */
+  .target-row {
+    display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap;
+  }
+  .target-toggle {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 14px;
+    border-radius: 8px;
+    border: 1.5px solid var(--border2);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    background: var(--surface);
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .target-toggle.active {
+    border-color: var(--accent);
+    color: var(--text);
+    background: rgba(124,106,247,0.1);
+  }
+  .target-toggle input { display: none; }
+
+  /* Publish buttons row */
+  .publish-buttons { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; }
+  .btn-allegro {
+    background: #ff5a00;
+    color: #fff;
+    font-weight: 600;
+    width: 100%;
+    justify-content: center;
+  }
+  .btn-allegro:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .btn-allegro:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-both {
+    background: linear-gradient(90deg, var(--accent) 0%, #ff5a00 100%);
+    color: #fff; font-weight: 600; width: 100%; justify-content: center;
+  }
+  .btn-both:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .btn-both:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  @media (max-width: 768px) {
+    main { grid-template-columns: 1fr; }
+    .panel { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div class="logo-mark">✦</div>
+    <span class="logo-text">Woo<span>AI</span></span>
+    <span style="color:var(--muted);font-size:13px;margin-left:4px">Product Agent</span>
+    <div class="header-user">
+      <span id="header-email" style="font-size:12px;color:var(--muted)"></span>
+      <button class="btn-header" onclick="openSettings()">⚙ Ustawienia</button>
+      <button class="btn-header" onclick="doLogout()">Wyloguj</button>
+    </div>
+  </header>
+
+  <!-- Settings modal -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal">
+      <h2>Ustawienia konta</h2>
+
+      <div class="modal-section">Sklep WordPress / WooCommerce</div>
+
+      <div style="background:rgba(124,106,247,0.08);border:1px solid rgba(124,106,247,0.2);border-radius:10px;padding:12px 14px;font-size:12px;color:#b0a4f9;margin-bottom:4px;line-height:1.6;">
+        🔑 <b>Jak wygenerować hasło aplikacji:</b><br>
+        WP Admin → Użytkownicy → Twój profil → przewiń na dół →<br>
+        <b>Hasła aplikacji</b> → wpisz nazwę „WooAI" → kliknij Dodaj → skopiuj hasło
+      </div>
+
+      <label>URL sklepu</label>
+      <input type="url" id="s-wc-url" placeholder="https://twojsklep.pl">
+      <label>Login WordPress (nazwa użytkownika)</label>
+      <input type="text" id="s-wp-user" placeholder="admin-xxxx">
+      <label>Hasło aplikacji WordPress</label>
+      <input type="password" id="s-wp-pass" placeholder="xxxx xxxx xxxx xxxx xxxx xxxx">
+
+      <details style="margin-top:16px;">
+        <summary>⚙ Zaawansowane — klucze API WooCommerce (opcjonalne)</summary>
+        <div style="margin-top:10px;">
+          <label>Consumer Key</label>
+          <input type="text" id="s-wc-key" placeholder="ck_...">
+          <label>Consumer Secret</label>
+          <input type="password" id="s-wc-secret" placeholder="cs_...">
+          <div style="font-size:11px;color:var(--muted);margin-top:6px;">Wypełnij tylko jeśli hasło aplikacji nie działa z WooCommerce</div>
+        </div>
+      </details>
+
+      <div class="modal-section">Allegro</div>
+      <label style="margin-top:0;">Miasto</label>
+      <input type="text" id="s-city" placeholder="Warszawa">
+      <label>Województwo</label>
+      <input type="text" id="s-province" placeholder="MAZOWIECKIE">
+      <label>Kod pocztowy</label>
+      <input type="text" id="s-postcode" placeholder="00-001">
+
+      <div class="settings-msg" id="settings-msg"></div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeSettings()">Anuluj</button>
+        <button class="btn-save" onclick="saveSettings()">Zapisz ustawienia</button>
+      </div>
+    </div>
+  </div>
+
+  <main>
+    <!-- LEFT: Upload -->
+    <div class="panel">
+      <div class="panel-title">Zdjęcia produktu</div>
+
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" accept="image/*" id="file-input" multiple>
+        <div class="upload-icon" id="upload-icon">📸</div>
+        <div class="upload-hint" id="upload-hint">
+          <strong>Przeciągnij zdjęcia lub kliknij</strong>
+          Max 5 zdjęć · JPG, PNG, WEBP
+        </div>
+      </div>
+
+      <!-- Thumbnails grid -->
+      <div class="image-grid" id="image-grid" style="display:none"></div>
+      <div class="image-count" id="image-count" style="display:none"></div>
+
+      <div class="field" style="margin-top:16px;">
+        <label style="margin-bottom:6px;display:block">Temat / dodatkowe info <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(opcjonalnie)</span></label>
+        <input type="text" id="topic-input" placeholder="np. Real Madryt, zapach wanilia, dla dzieci…" style="background:var(--surface2);">
+        <div style="font-size:11px;color:var(--muted);margin-top:5px;">AI zachowa temat i zbuduje na nim opis</div>
+      </div>
+
+      <button class="btn btn-primary" id="analyze-btn" disabled>
+        <span id="analyze-icon">✨</span>
+        <span id="analyze-text">Analizuj i generuj</span>
+      </button>
+
+      <div class="status-bar" id="status-bar">
+        <div class="spinner" id="status-spinner" style="display:none"></div>
+        <span id="status-text"></span>
+      </div>
+
+      <div style="margin-top:24px;padding:12px 16px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);font-size:12px;color:var(--muted);">
+        Dane WooCommerce i Allegro skonfiguruj w <button onclick="openSettings()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:0;text-decoration:underline;">Ustawieniach</button>
+      </div>
+
+      <!-- Allegro Auth card -->
+      <div class="allegro-card" id="allegro-card" style="opacity:0;transition:opacity .3s">
+        <div class="allegro-card-header">
+          <div class="allegro-status-dot" id="allegro-dot"></div>
+          <span>Allegro Sandbox</span>
+        </div>
+        <div class="allegro-status-label" id="allegro-status-label"></div>
+
+        <!-- Auth status (shown during auth flow) -->
+        <div class="device-code-box" id="device-code-box">
+          <div style="text-align:center;padding:4px 0">
+            <div style="font-size:22px;margin-bottom:6px;">🔐</div>
+            <div style="font-size:13px;color:var(--text);font-weight:500;margin-bottom:4px;">Okno logowania Allegro otwarte</div>
+            <div style="font-size:12px;color:var(--muted)" id="poll-status">Zaloguj się w oknie przeglądarki…</div>
+          </div>
+        </div>
+
+        <button class="btn" id="allegro-auth-btn"
+          style="background:rgba(255,90,0,0.15);color:#ff8040;border:1px solid rgba(255,90,0,0.3);font-size:13px;padding:8px 16px;width:100%;justify-content:center;margin-top:4px;">
+          🔐 Autoryzuj Allegro
+        </button>
+      </div>
+    </div>
+
+    <!-- RIGHT: Product preview & edit -->
+    <div class="panel">
+      <div class="panel-title">Wygenerowany produkt</div>
+
+      <div class="empty-state" id="empty-state">
+        <div class="big-icon">🪄</div>
+        <p>Dodaj zdjęcia i kliknij Analizuj — AI wykryje cechy produktu i wygeneruje listing</p>
+      </div>
+
+      <div class="product-form" id="product-form">
+
+        <!-- ── Podstawowe ── -->
+        <div class="section-divider">Podstawowe informacje</div>
+
+        <div class="field">
+          <label>Tytuł produktu</label>
+          <input type="text" id="f-name" placeholder="Nazwa produktu">
+        </div>
+        <div class="field">
+          <label>Krótki opis</label>
+          <input type="text" id="f-short-desc" placeholder="Jedno zdanie do kart produktowych">
+        </div>
+        <div class="field">
+          <label>Pełny opis</label>
+          <textarea id="f-description" rows="5" placeholder="Pełny opis produktu (HTML ok)"></textarea>
+        </div>
+        <div class="price-row">
+          <div class="field">
+            <label>Kategoria</label>
+            <input type="text" id="f-category" placeholder="np. Akcesoria">
+          </div>
+          <div class="field">
+            <label>Cena (PLN)</label>
+            <div style="position:relative">
+              <input type="text" id="f-price" placeholder="np. 49.99" style="padding-right:38px">
+              <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;pointer-events:none">zł</span>
+            </div>
+          </div>
+        </div>
+        <div class="price-row">
+          <div class="field">
+            <label>Ilość w magazynie</label>
+            <input type="number" id="f-stock" placeholder="np. 10" min="0">
+          </div>
+          <div class="field">
+            <label>Typ produktu</label>
+            <select id="f-bundle">
+              <option value="false">Pojedynczy produkt</option>
+              <option value="true">Zestaw / Bundle</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Tagi <span style="font-weight:400;text-transform:none;letter-spacing:0">(Enter aby dodać)</span></label>
+          <div class="tags-input" id="tags-container">
+            <input type="text" id="tag-input-field" placeholder="Dodaj tag…">
+          </div>
+        </div>
+
+        <!-- ── SEO ── -->
+        <div class="section-divider">SEO</div>
+
+        <div class="field">
+          <div class="field-meta">
+            <label style="margin:0">SEO Title</label>
+            <span class="char-counter" id="seo-title-counter">0 / 60</span>
+          </div>
+          <input type="text" id="f-seo-title" placeholder="Tytuł strony dla Google (50-60 znaków)" maxlength="80">
+        </div>
+        <div class="field">
+          <div class="field-meta">
+            <label style="margin:0">Meta Description</label>
+            <span class="char-counter" id="meta-desc-counter">0 / 160</span>
+          </div>
+          <textarea id="f-meta-desc" rows="3" placeholder="Opis strony dla Google (150-160 znaków)" maxlength="200"></textarea>
+        </div>
+
+        <!-- Google preview -->
+        <div style="margin-bottom:16px;">
+          <label style="margin-bottom:8px;display:block">Podgląd Google</label>
+          <div class="seo-preview">
+            <div class="seo-url" id="seo-preview-url">yourstore.com › produkt</div>
+            <div class="seo-title-preview" id="seo-preview-title">Tytuł produktu pojawi się tutaj</div>
+            <div class="seo-desc-preview" id="seo-preview-desc">Meta description pojawi się tutaj — zachęć użytkowników do kliknięcia.</div>
+          </div>
+        </div>
+
+        <!-- Target selection -->
+        <div style="margin-bottom:4px;margin-top:4px;">
+          <label style="margin-bottom:8px;display:block">Wyślij na platformy</label>
+          <div class="target-row">
+            <label class="target-toggle active" id="toggle-woo">
+              <input type="checkbox" id="target-woo" checked>
+              🛒 WooCommerce
+            </label>
+            <label class="target-toggle active" id="toggle-allegro">
+              <input type="checkbox" id="target-allegro" checked>
+              🟠 Allegro Sandbox
+            </label>
+          </div>
+        </div>
+
+        <div class="publish-buttons">
+          <button class="btn btn-both" id="publish-btn">
+            🚀 Wyślij na wybrane platformy
+          </button>
+        </div>
+
+        <div class="publish-result" id="publish-result">
+          <h4>✓ Opublikowano!</h4>
+          <div id="publish-images-info" style="font-size:12px;color:var(--green);opacity:0.8;margin-bottom:10px;"></div>
+          <div id="platform-results"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+let currentFiles = [];
+let tags = [];
+let allegroAuthorized = false;
+let allegroStatusFetched = false;
+
+// ─── Auth check on load ───────────────────────────────────────────────────────
+async function initAuth() {
+  try {
+    const resp = await fetch('/auth/me', { credentials: 'include' });
+    if (!resp.ok) { window.location.href = '/login'; return; }
+    const data = await resp.json();
+    document.getElementById('header-email').textContent = data.email;
+    if (!data.settings_complete) openSettings();
+  } catch { window.location.href = '/login'; }
+}
+
+async function doLogout() {
+  await fetch('/auth/logout', { method: 'POST', credentials: 'include' });
+  window.location.href = '/login';
+}
+
+// ─── Settings modal ───────────────────────────────────────────────────────────
+async function openSettings() {
+  const resp = await fetch('/api/settings', { credentials: 'include' });
+  if (!resp.ok) return;
+  const s = await resp.json();
+  document.getElementById('s-wc-url').value    = s.wc_store_url || '';
+  document.getElementById('s-wc-key').value    = s.wc_consumer_key || '';
+  document.getElementById('s-wc-secret').value = s.wc_consumer_secret || '';
+  document.getElementById('s-wp-user').value   = s.wp_username || '';
+  document.getElementById('s-wp-pass').value   = s.wp_app_password || '';
+  document.getElementById('s-allegro-cat').value = s.allegro_default_category_id || '';
+  document.getElementById('s-city').value         = s.allegro_city || '';
+  document.getElementById('s-province').value     = s.allegro_province || '';
+  document.getElementById('s-postcode').value     = s.allegro_postcode || '';
+  document.getElementById('settings-msg').className = 'settings-msg';
+  document.getElementById('settings-modal').classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('settings-modal').classList.remove('open');
+}
+
+async function saveSettings() {
+  const msg = document.getElementById('settings-msg');
+  msg.className = 'settings-msg';
+  const body = {
+    wc_store_url:       document.getElementById('s-wc-url').value.trim(),
+    wc_consumer_key:    document.getElementById('s-wc-key').value.trim(),
+    wc_consumer_secret: document.getElementById('s-wc-secret').value.trim(),
+    wp_username:        document.getElementById('s-wp-user').value.trim(),
+    wp_app_password:    document.getElementById('s-wp-pass').value.trim(),
+    allegro_default_category_id: document.getElementById('s-allegro-cat').value.trim(),
+    allegro_city:                document.getElementById('s-city').value.trim(),
+    allegro_province:            document.getElementById('s-province').value.trim(),
+    allegro_postcode:            document.getElementById('s-postcode').value.trim(),
+  };
+  const resp = await fetch('/api/settings', {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await resp.json();
+  if (data.success) {
+    msg.textContent = '✓ Zapisano!';
+    msg.className = 'settings-msg ok';
+    setTimeout(closeSettings, 1200);
+  } else {
+    msg.textContent = data.error || 'Błąd zapisu';
+    msg.className = 'settings-msg err';
+  }
+}
+
+// Close modal on overlay click
+document.getElementById('settings-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeSettings();
+});
+
+// ─── Upload zone ─────────────────────────────────────────────────────────────
+const zone       = document.getElementById('upload-zone');
+const fileInput  = document.getElementById('file-input');
+const analyzeBtn = document.getElementById('analyze-btn');
+
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+  e.preventDefault();
+  zone.classList.remove('drag-over');
+  addFiles(Array.from(e.dataTransfer.files));
+});
+fileInput.addEventListener('change', () => {
+  addFiles(Array.from(fileInput.files));
+  fileInput.value = '';
+});
+
+const MAX_IMAGES = 5;
+
+function addFiles(files) {
+  const imageFiles = files.filter(f => f.type.startsWith('image/'));
+  for (const f of imageFiles) {
+    if (currentFiles.length >= MAX_IMAGES) break;
+    const isDupe = currentFiles.some(cf => cf.name === f.name && cf.size === f.size);
+    if (!isDupe) currentFiles.push(f);
+  }
+  if (files.length > 0 && currentFiles.length >= MAX_IMAGES) {
+    setStatus('', '');  // clear
+    const bar = document.getElementById('status-bar');
+    bar.className = 'status-bar error';
+    bar.style.display = 'flex';
+    document.getElementById('status-spinner').style.display = 'none';
+    document.getElementById('status-text').textContent = `Maksymalnie ${MAX_IMAGES} zdjęć`;
+    setTimeout(() => { bar.style.display = 'none'; bar.className = 'status-bar'; }, 2500);
+  }
+  renderPreviews();
+  analyzeBtn.disabled = currentFiles.length === 0;
+}
+
+function removeFile(index) {
+  currentFiles.splice(index, 1);
+  renderPreviews();
+  analyzeBtn.disabled = currentFiles.length === 0;
+}
+
+function renderPreviews() {
+  const grid  = document.getElementById('image-grid');
+  const count = document.getElementById('image-count');
+
+  if (currentFiles.length === 0) {
+    grid.style.display = 'none';
+    count.style.display = 'none';
+    document.getElementById('upload-zone').style.display = '';
+    return;
+  }
+
+  document.getElementById('upload-zone').style.display = 'none';
+  grid.style.display = 'grid';
+  count.style.display = 'block';
+
+  grid.innerHTML = '';
+  currentFiles.forEach((file, i) => {
+    const thumb = document.createElement('div');
+    thumb.className = 'image-thumb';
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(file);
+    const badge = document.createElement('div');
+    badge.className = 'thumb-badge';
+    badge.textContent = i === 0 ? 'GŁÓWNE' : `#${i+1}`;
+    const btn = document.createElement('button');
+    btn.className = 'thumb-remove';
+    btn.innerHTML = '×';
+    btn.title = 'Usuń zdjęcie';
+    btn.addEventListener('click', (e) => { e.stopPropagation(); removeFile(i); });
+    thumb.appendChild(img);
+    thumb.appendChild(badge);
+    thumb.appendChild(btn);
+    grid.appendChild(thumb);
+  });
+
+  // Przycisk "+" gdy jest miejsce na więcej
+  if (currentFiles.length < MAX_IMAGES) {
+    const addBtn = document.createElement('div');
+    addBtn.className = 'add-more-btn';
+    addBtn.title = `Dodaj zdjęcie (${currentFiles.length}/${MAX_IMAGES})`;
+    addBtn.innerHTML = `<span>+</span><input type="file" accept="image/*" multiple>`;
+    addBtn.querySelector('input').addEventListener('change', e => {
+      addFiles(Array.from(e.target.files));
+      e.target.value = '';
+    });
+    grid.appendChild(addBtn);
+  }
+
+  count.innerHTML = `<span>${currentFiles.length}/${MAX_IMAGES}</span> zdjęć — pierwsze będzie zdjęciem głównym`;
+}
+
+// ─── Analyze ─────────────────────────────────────────────────────────────────
+analyzeBtn.addEventListener('click', async () => {
+  if (!currentFiles.length) return;
+
+  analyzeBtn.disabled = true;
+  document.getElementById('analyze-text').textContent = 'Analizuję…';
+  setStatus('loading', '🔍 Wysyłam do modelu wizyjnego…');
+  hideProduct();
+
+  const formData = new FormData();
+  currentFiles.forEach(f => formData.append('images', f));
+  const topic = document.getElementById('topic-input').value.trim();
+  if (topic) formData.append('topic', topic);
+
+  try {
+    setStatus('loading', `🧠 Analizuję ${currentFiles.length > 1 ? currentFiles.length + ' zdjęć' : 'zdjęcie'} i generuję listing…`);
+    const resp = await fetch('/api/analyze', { method: 'POST', body: formData, credentials: 'include' });
+    if (resp.status === 401) { window.location.href = '/login'; return; }
+    const data = await resp.json();
+
+    if (!resp.ok || !data.success) throw new Error(data.error || 'Unknown error');
+
+    populateForm(data.product);
+    document.getElementById('empty-state').style.display = 'none';
+    document.getElementById('product-form').classList.add('visible');
+    setStatus('success', '✓ Produkt wygenerowany — sprawdź i opublikuj poniżej');
+
+  } catch (err) {
+    setStatus('error', '✗ ' + err.message);
+  } finally {
+    analyzeBtn.disabled = false;
+    document.getElementById('analyze-text').textContent = 'Analizuj i generuj';
+  }
+});
+
+function populateForm(product) {
+  document.getElementById('f-name').value        = product.name || '';
+  document.getElementById('f-short-desc').value  = product.short_description || '';
+  document.getElementById('f-description').value = product.description || '';
+  document.getElementById('f-category').value    = product.category || '';
+  document.getElementById('f-price').value       = product.price_suggestion || '';
+  document.getElementById('f-stock').value       = product.stock_quantity ?? 10;
+  document.getElementById('f-bundle').value      = product.is_bundle ? 'true' : 'false';
+
+  document.getElementById('f-seo-title').value = product.seo_title || '';
+  document.getElementById('f-meta-desc').value = product.meta_description || '';
+  updateSeoCounter('f-seo-title', 'seo-title-counter', 60);
+  updateSeoCounter('f-meta-desc', 'meta-desc-counter', 160);
+  updateSeoPreview();
+
+  tags = product.tags || [];
+  renderTags();
+
+  document.getElementById('publish-result').classList.remove('visible');
+}
+
+function hideProduct() {
+  document.getElementById('product-form').classList.remove('visible');
+  document.getElementById('empty-state').style.display = '';
+}
+
+// ─── SEO counters & preview ───────────────────────────────────────────────────
+function updateSeoCounter(inputId, counterId, ideal) {
+  const input   = document.getElementById(inputId);
+  const counter = document.getElementById(counterId);
+  const len     = input.value.length;
+  counter.textContent = `${len} / ${ideal}`;
+  counter.className = 'char-counter';
+  if (len >= ideal - 10 && len <= ideal + 5) counter.classList.add('good');
+  else if (len > ideal + 5) counter.classList.add('warn');
+}
+
+function updateSeoPreview() {
+  const title = document.getElementById('f-seo-title').value || document.getElementById('f-name').value || 'Tytuł produktu pojawi się tutaj';
+  const desc  = document.getElementById('f-meta-desc').value || 'Meta description pojawi się tutaj — zachęć użytkowników do kliknięcia.';
+  const store = (document.getElementById('s-wc-url') ? document.getElementById('s-wc-url').value : '').replace(/https?:\/\//, '').replace(/\/$/, '') || 'yourstore.com';
+  document.getElementById('seo-preview-title').textContent = title;
+  document.getElementById('seo-preview-desc').textContent  = desc;
+  document.getElementById('seo-preview-url').textContent   = `${store} › produkt`;
+}
+
+document.getElementById('f-seo-title').addEventListener('input', () => {
+  updateSeoCounter('f-seo-title', 'seo-title-counter', 60);
+  updateSeoPreview();
+});
+document.getElementById('f-meta-desc').addEventListener('input', () => {
+  updateSeoCounter('f-meta-desc', 'meta-desc-counter', 160);
+  updateSeoPreview();
+});
+document.getElementById('f-name').addEventListener('input', updateSeoPreview);
+
+// ─── Tag input ────────────────────────────────────────────────────────────────
+document.getElementById('tags-container').addEventListener('click', () => {
+  document.getElementById('tag-input-field').focus();
+});
+document.getElementById('tag-input-field').addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    const val = e.target.value.trim().replace(/,$/, '');
+    if (val && !tags.includes(val)) { tags.push(val); renderTags(); }
+    e.target.value = '';
+  }
+  if (e.key === 'Backspace' && !e.target.value && tags.length) {
+    tags.pop(); renderTags();
+  }
+});
+
+function renderTags() {
+  const container = document.getElementById('tags-container');
+  const input     = document.getElementById('tag-input-field');
+  container.querySelectorAll('.tag-pill').forEach(p => p.remove());
+  tags.forEach((tag, i) => {
+    const pill = document.createElement('span');
+    pill.className = 'tag-pill';
+    pill.innerHTML = `${tag}<button onclick="removeTag(${i})">×</button>`;
+    container.insertBefore(pill, input);
+  });
+}
+function removeTag(i) { tags.splice(i, 1); renderTags(); }
+
+// ─── Target toggles ───────────────────────────────────────────────────────────
+document.getElementById('toggle-woo').addEventListener('click', () => {
+  const cb = document.getElementById('target-woo');
+  cb.checked = !cb.checked;
+  document.getElementById('toggle-woo').classList.toggle('active', cb.checked);
+});
+document.getElementById('toggle-allegro').addEventListener('click', () => {
+  const cb = document.getElementById('target-allegro');
+  cb.checked = !cb.checked;
+  document.getElementById('toggle-allegro').classList.toggle('active', cb.checked);
+});
+
+// ─── Allegro Auth ─────────────────────────────────────────────────────────────
+async function checkAllegroStatus() {
+  if (allegroStatusFetched) return;
+  allegroStatusFetched = true;
+  try {
+    const resp = await fetch('/api/allegro/status', { credentials: 'include' });
+    if (resp.ok) {
+      const data = await resp.json();
+      allegroAuthorized = !!data.authorized;
+    }
+  } catch (_) {}
+  updateAllegroUI();
+  document.getElementById('allegro-card').style.opacity = '1';
+}
+
+function updateAllegroUI() {
+  const dot    = document.getElementById('allegro-dot');
+  const label  = document.getElementById('allegro-status-label');
+  const authBtn = document.getElementById('allegro-auth-btn');
+  if (allegroAuthorized) {
+    dot.classList.add('ok');
+    label.innerHTML = '<span style="color:var(--green)">✓ Połączono z Allegro Sandbox</span>';
+    authBtn.textContent = '🔄 Odśwież autoryzację';
+  } else {
+    dot.classList.remove('ok');
+    label.textContent = 'Nie zalogowano — kliknij Autoryzuj';
+    authBtn.textContent = '🔐 Autoryzuj Allegro';
+  }
+}
+
+document.getElementById('allegro-auth-btn').addEventListener('click', startAllegroAuth);
+
+async function startAllegroAuth() {
+  const authBtn = document.getElementById('allegro-auth-btn');
+  authBtn.disabled = true;
+  authBtn.textContent = 'Łączę…';
+
+  try {
+    const resp = await fetch('/api/allegro/auth/start', { credentials: 'include' });
+    const data = await resp.json();
+    if (!resp.ok || data.error) throw new Error(data.error || 'Błąd startu autoryzacji');
+
+    const w = 600, h = 700;
+    const popup = window.open(
+      data.auth_url, 'allegro_auth',
+      `width=${w},height=${h},left=${Math.round(screen.width/2-w/2)},top=${Math.round(screen.height/2-h/2)},toolbar=no,menubar=no`
+    );
+
+    document.getElementById('device-code-box').classList.add('visible');
+    authBtn.textContent = '⏳ Oczekuję na logowanie…';
+
+    let done = false;
+
+    function finish(success, errMsg) {
+      if (done) return;
+      done = true;
+      clearInterval(closedInterval);
+      window.removeEventListener('message', onMsg);
+      document.getElementById('device-code-box').classList.remove('visible');
+      authBtn.disabled = false;
+      if (success) {
+        allegroAuthorized = true;
+        updateAllegroUI();
+      } else {
+        authBtn.textContent = '🔐 Autoryzuj Allegro';
+        if (errMsg) alert('Błąd autoryzacji: ' + errMsg);
+      }
+    }
+
+    // postMessage z callback page
+    function onMsg(e) {
+      if (!e.data?.allegroAuth) return;
+      if (e.data.allegroAuth === 'success') finish(true);
+      else finish(false, e.data.error);
+    }
+    window.addEventListener('message', onMsg);
+
+    // fallback: popup zamknięty ręcznie — sprawdź status RAZ
+    const closedInterval = setInterval(async () => {
+      if (!popup || popup.closed) {
+        clearInterval(closedInterval);
+        if (done) return;
+        const s = await fetch('/api/allegro/status', { credentials: 'include' }).then(r => r.json()).catch(() => ({}));
+        finish(!!s.authorized, null);
+      }
+    }, 1500);
+
+  } catch (err) {
+    authBtn.disabled = false;
+    authBtn.textContent = '🔐 Autoryzuj Allegro';
+    alert('Błąd: ' + err.message);
+  }
+}
+
+// Init on load
+window.addEventListener('load', async () => {
+  await initAuth();
+  await checkAllegroStatus();
+});
+
+// ─── Publish ──────────────────────────────────────────────────────────────────
+document.getElementById('publish-btn').addEventListener('click', async () => {
+  const publishBtn = document.getElementById('publish-btn');
+
+  const wooChecked     = document.getElementById('target-woo').checked;
+  const allegroChecked = document.getElementById('target-allegro').checked;
+
+  if (!wooChecked && !allegroChecked) {
+    alert('Wybierz co najmniej jedną platformę!');
+    return;
+  }
+
+  const targets = [];
+  if (wooChecked)     targets.push('woocommerce');
+  if (allegroChecked) targets.push('allegro');
+
+  const product = {
+    name:              document.getElementById('f-name').value,
+    short_description: document.getElementById('f-short-desc').value,
+    description:       document.getElementById('f-description').value,
+    category:          document.getElementById('f-category').value,
+    price_suggestion:  document.getElementById('f-price').value,
+    stock_quantity:    parseInt(document.getElementById('f-stock').value) || null,
+    is_bundle:         document.getElementById('f-bundle').value === 'true',
+    tags,
+    seo_title:         document.getElementById('f-seo-title').value,
+    meta_description:  document.getElementById('f-meta-desc').value,
+  };
+
+  const formData = new FormData();
+  formData.append('product', JSON.stringify(product));
+  formData.append('targets', JSON.stringify(targets));
+  currentFiles.forEach(f => formData.append('images', f));
+
+  publishBtn.disabled = true;
+  publishBtn.textContent = '⏳ Wysyłam…';
+  const platformsLabel = targets.map(t => t === 'woocommerce' ? 'WooCommerce' : 'Allegro').join(' + ');
+  const imgMsg = currentFiles.length ? ` + ${currentFiles.length} zdjęć` : '';
+  setStatus('loading', `⏳ Wysyłam na ${platformsLabel}${imgMsg}…`);
+  document.getElementById('publish-result').classList.remove('visible');
+
+  try {
+    const resp = await fetch('/api/publish', { method: 'POST', body: formData, credentials: 'include' });
+
+    let data;
+    try { data = await resp.json(); }
+    catch { throw new Error(`Serwer zwrócił błąd ${resp.status} — sprawdź terminal`); }
+
+    // Images info
+    const imgInfo = document.getElementById('publish-images-info');
+    imgInfo.textContent = (data.images_uploaded > 0)
+      ? `📷 Wgrano ${data.images_uploaded} zdjęcie${data.images_uploaded > 1 ? (data.images_uploaded < 5 ? 'a' : '') : ''} do WordPress`
+      : '';
+
+    // Platform results
+    const container = document.getElementById('platform-results');
+    container.innerHTML = '';
+
+    if (data.woocommerce) {
+      const wc = data.woocommerce;
+      const row = document.createElement('div');
+      row.className = 'platform-row';
+      if (wc.success) {
+        row.innerHTML = `
+          <span class="platform-icon">🛒</span>
+          <span class="platform-name">WooCommerce</span>
+          <span class="platform-status-ok">✓ Szkic #${wc.product_id}</span>
+          <a class="platform-link" href="${wc.edit_url}" target="_blank" style="margin-left:auto">Edytuj →</a>`;
+      } else {
+        row.innerHTML = `
+          <span class="platform-icon">🛒</span>
+          <span class="platform-name">WooCommerce</span>
+          <span class="platform-status-err">✗ ${wc.error || 'Błąd'}</span>`;
+      }
+      container.appendChild(row);
+    }
+
+    if (data.allegro) {
+      const al = data.allegro;
+      const row = document.createElement('div');
+      row.className = 'platform-row';
+      if (al.success) {
+        row.innerHTML = `
+          <span class="platform-icon">🟠</span>
+          <span class="platform-name">Allegro Sandbox</span>
+          <span class="platform-status-ok">✓ Oferta #${al.offer_id}</span>
+          <a class="platform-link" href="${al.offer_url}" target="_blank" style="margin-left:auto">Zobacz →</a>`;
+      } else {
+        row.innerHTML = `
+          <span class="platform-icon">🟠</span>
+          <span class="platform-name">Allegro Sandbox</span>
+          <span class="platform-status-err">✗ ${al.error || 'Błąd'}</span>`;
+      }
+      container.appendChild(row);
+    }
+
+    document.getElementById('publish-result').classList.add('visible');
+
+    const anyOk = (data.woocommerce?.success) || (data.allegro?.success);
+    if (anyOk) {
+      setStatus('success', '✓ Opublikowano na wybranych platformach');
+    } else {
+      setStatus('error', '✗ Wszystkie platformy zwróciły błąd — sprawdź szczegóły poniżej');
+    }
+
+  } catch (err) {
+    setStatus('error', '✗ ' + err.message);
+  } finally {
+    publishBtn.disabled = false;
+    publishBtn.textContent = '🚀 Wyślij na wybrane platformy';
+  }
+});
+
+// ─── Status helper ────────────────────────────────────────────────────────────
+function setStatus(type, msg) {
+  const bar     = document.getElementById('status-bar');
+  const spinner = document.getElementById('status-spinner');
+  const text    = document.getElementById('status-text');
+  bar.className = 'status-bar';
+  if (!type) { bar.style.display = 'none'; return; }
+  bar.classList.add(type);
+  spinner.style.display = type === 'loading' ? 'block' : 'none';
+  text.textContent = msg;
+}
+</script>
+</body>
+</html>
