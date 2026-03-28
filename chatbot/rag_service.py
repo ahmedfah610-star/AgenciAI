@@ -8,7 +8,7 @@ from anthropic import Anthropic
 from .embedding_service import embed, cosine_similarity
 
 anthropic = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
-CHAT_MODEL = os.getenv('ANTHROPIC_CHAT_MODEL', 'claude-haiku-4-5-20251001')
+CHAT_MODEL = os.getenv('ANTHROPIC_CHAT_MODEL', 'claude-haiku-4-5-20251001').strip()
 TOP_K      = 5
 MIN_SCORE  = 0.25
 HISTORY_N  = 6
