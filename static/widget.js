@@ -465,8 +465,8 @@
     </svg>`;
   }
   function sendIcon() {
-    return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path d="M5 12h14M13 6l6 6-6 6" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="white">
+      <polygon points="5,4 19,12 5,20 5,4"/>
     </svg>`;
   }
 
