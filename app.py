@@ -892,54 +892,53 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
     # Build compact param list for Claude (non-priority params)
     params_for_ai = []
     valid_value_ids: dict[str, set] = {}
-    # Direct matches we handle ourselves (skip from Claude)
-    direct_results: list[dict] = []
-    direct_param_ids: set[str] = set()
+    offer_params: list[dict] = []   # offerScope=True/None
+    product_params: list[dict] = [] # offerScope=False → goes to product.parameters
+
+    def _get_scope(param):
+        for candidate in [
+            param.get("offerScope"),
+            param.get("options", {}).get("offerScope"),
+            param.get("restrictions", {}).get("offerScope"),
+        ]:
+            if candidate is not None:
+                return candidate
+        return None  # unknown → treat as offer-scope
+
+    def _build_param_entry(param_id, user_val, ptype, dict_vals):
+        """Build a parameter dict from user value."""
+        if ptype == "string":
+            return {"id": param_id, "values": [user_val]}
+        elif ptype == "dictionary" and dict_vals:
+            best_id = _fuzzy_match_value(user_val, dict_vals)
+            if best_id:
+                return {"id": param_id, "valuesIds": [best_id]}
+        # fallback — open text
+        return {"id": param_id, "values": [user_val]}
 
     for p in params_def:
         param_id   = str(p["id"])
         param_name = p.get("name", "")
         ptype      = p["type"]
         dict_vals  = p.get("dictionaryValues", [])
+        scope      = _get_scope(p)
+        is_product_scope = (scope is False)
 
-        # ── offerScope check FIRST for every param ──
-        # offerScope=False → product-catalog only, cannot be in offer → skip always
-        raw_scope = None
-        for candidate in [
-            p.get("offerScope"),
-            p.get("options", {}).get("offerScope"),
-            p.get("restrictions", {}).get("offerScope"),
-        ]:
-            if candidate is not None:
-                raw_scope = candidate
-                break
-        if raw_scope is False:
-            if param_name in _DIRECT_MAP and _DIRECT_MAP[param_name]:
-                app.logger.info("Param %s (%s): offerScope=False, skipping even though user provided value",
-                                param_name, param_id)
-            continue  # skip product-catalog-only params — no exceptions
-
-        # ── Direct handling for Marka, Rozmiar, Kolor, Stan (only if offerScope allows) ──
         user_val = _DIRECT_MAP.get(param_name, "")
+
         if user_val:
-            if ptype == "string":
-                direct_results.append({"id": param_id, "values": [user_val]})
-                direct_param_ids.add(param_id)
-                app.logger.info("Direct string: %s=%s", param_name, user_val)
-                continue
-            elif ptype == "dictionary":
-                if dict_vals:
-                    best_id = _fuzzy_match_value(user_val, dict_vals)
-                    if best_id:
-                        direct_results.append({"id": param_id, "valuesIds": [best_id]})
-                        direct_param_ids.add(param_id)
-                        app.logger.info("Direct dict: %s=%s → %s", param_name, user_val, best_id)
-                        continue
-                # No match found — try as open text
-                direct_results.append({"id": param_id, "values": [user_val]})
-                direct_param_ids.add(param_id)
-                app.logger.info("Direct dict fallback: %s=%s", param_name, user_val)
-                continue
+            entry = _build_param_entry(param_id, user_val, ptype, dict_vals)
+            if is_product_scope:
+                product_params.append(entry)
+                app.logger.info("Product param: %s=%s → %s", param_name, user_val, entry)
+            else:
+                offer_params.append(entry)
+                app.logger.info("Offer param: %s=%s → %s", param_name, user_val, entry)
+            continue
+
+        # Non-user param: only send offer-scope ones via Claude
+        if is_product_scope:
+            continue
 
         entry: dict = {"id": param_id, "name": param_name, "type": ptype,
                        "required": p.get("required", False)}
@@ -1003,11 +1002,11 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
         except Exception as e:
             app.logger.warning("AI parameter fill failed: %s", e)
 
-    app.logger.info("Allegro params: %d direct + %d AI = %d total",
-                    len(direct_results), len(ai_results),
-                    len(direct_results) + len(ai_results))
-    # Return separately so publish can protect user-provided params during retry
-    return direct_results, ai_results
+    app.logger.info("Allegro params: %d offer + %d product + %d AI",
+                    len(offer_params), len(product_params), len(ai_results))
+    # offer_params → offer["parameters"]
+    # product_params → offer["product"]["parameters"]
+    return offer_params + ai_results, product_params
 
 
 def publish_to_allegro(user: User, product_data: dict,
@@ -1061,16 +1060,16 @@ def publish_to_allegro(user: User, product_data: dict,
     vat     = opts.get("vat", {})
     pl_vat  = vat.get("pl", "23")
 
-    # Fill parameters — returns (user_params, ai_params) separately
-    user_params, ai_params = _fill_allegro_parameters(
+    # Fill parameters — returns (offer_params, product_params)
+    # offer_params → offer["parameters"] (offerScope=True/None)
+    # product_params → offer["product"]["parameters"] (offerScope=False: Marka, Rozmiar)
+    parameters, product_params = _fill_allegro_parameters(
         access_token, category_id, merged_features,
         vat_rate=pl_vat,
         product_name=product_data.get("name", ""),
         product_description=product_data.get("short_description", "") or
                             _strip_html(product_data.get("description", ""))[:400],
     )
-    user_param_ids = {str(p["id"]) for p in user_params}
-    parameters = user_params + ai_params
 
     invoice = "WITHOUT_VAT" if pl_vat == "EXEMPT" else "VAT"
 
@@ -1110,9 +1109,17 @@ def publish_to_allegro(user: User, product_data: dict,
     if opts.get("fulfillment") == "ONE_FULFILLMENT":
         offer["fulfillment"] = {"availabilityCode": "ONE_FULFILLMENT"}
 
-    # Parameters (VAT + product features matched to category params)
+    # Offer-scope parameters (Stan, Kolor, Stawka VAT, etc.)
     if parameters:
         offer["parameters"] = parameters
+
+    # Product-scope parameters (Marka, Rozmiar) → offer["product"]["parameters"]
+    if product_params:
+        offer["product"] = {
+            "name": product_data["name"][:75],
+            "parameters": product_params,
+        }
+        app.logger.info("Product params: %s", json.dumps(product_params))
 
     image_upload_errors = []
     allegro_image_urls, image_upload_errors = _upload_images_to_allegro(
@@ -1175,36 +1182,21 @@ def publish_to_allegro(user: User, product_data: dict,
 
             bad_param_ids.discard("")
 
-            if bad_param_ids and offer.get("parameters"):
-                # Remove specific bad params — NEVER remove user-provided (Marka/Rozmiar)
-                removable = bad_param_ids - user_param_ids
-                protected = bad_param_ids & user_param_ids
-                if protected:
-                    app.logger.warning("Keeping protected user params: %s", protected)
+            if (bad_param_ids or is_param_error) and offer.get("parameters"):
                 before = len(offer["parameters"])
-                offer["parameters"] = [
-                    p for p in offer["parameters"]
-                    if str(p.get("id", "")) not in removable
-                ]
+                if bad_param_ids:
+                    offer["parameters"] = [
+                        p for p in offer["parameters"]
+                        if str(p.get("id", "")) not in bad_param_ids
+                    ]
                 after = len(offer["parameters"])
-                app.logger.warning("Attempt %d: removed %s (%d→%d), kept user=%s",
-                                   _attempt, removable, before, after, protected)
-                if after == before and removable:
-                    # IDs not in our list — drop only AI params, keep user params
-                    app.logger.warning("Attempt %d: bad IDs not found, dropping AI params only", _attempt)
-                    offer["parameters"] = [p for p in offer["parameters"]
-                                           if str(p.get("id", "")) in user_param_ids]
-                    if not offer["parameters"]:
-                        offer.pop("parameters", None)
-                fixed = True
-
-            elif is_param_error and offer.get("parameters"):
-                # Generic param error, no specific ID — drop AI params, keep user params
-                app.logger.warning("Attempt %d: generic param error, dropping AI params", _attempt)
-                offer["parameters"] = [p for p in offer["parameters"]
-                                       if str(p.get("id", "")) in user_param_ids]
-                if not offer["parameters"]:
+                if after == before:
+                    # Nothing removed — drop all offer parameters
                     offer.pop("parameters", None)
+                    app.logger.warning("Attempt %d: dropped all offer params", _attempt)
+                else:
+                    app.logger.warning("Attempt %d: removed %s (%d→%d)",
+                                       _attempt, bad_param_ids, before, after)
                 fixed = True
 
             # Tax error
