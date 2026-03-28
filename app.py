@@ -783,17 +783,14 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
                             found_id = dv["id"]
                             break
                 if found_id:
-                    result.append({"id": param_id, "valuesIds": [found_id],
-                                   "values": [], "rangeValue": None})
+                    result.append({"id": param_id, "valuesIds": [found_id]})
             elif param_type == "string":
                 max_len = restrictions.get("maxLength", 200)
-                result.append({"id": param_id, "values": [matched_val_str[:max_len]],
-                               "valuesIds": [], "rangeValue": None})
+                result.append({"id": param_id, "values": [matched_val_str[:max_len]]})
             elif param_type in ("integer", "float"):
                 val = str(int(float(matched_val_str)) if param_type == "integer"
                           else round(float(matched_val_str), 2))
-                result.append({"id": param_id, "values": [val],
-                               "valuesIds": [], "rangeValue": None})
+                result.append({"id": param_id, "values": [val]})
         except Exception as e:
             app.logger.debug("Parameter %s (%s) fill error: %s", param_name, param_type, e)
 
@@ -847,10 +844,13 @@ def publish_to_allegro(user: User, product_data: dict,
 
     opts = allegro_options or {}
 
+    vat     = opts.get("vat", {})
+    pl_vat  = vat.get("pl", "23")
+    invoice = "WITHOUT_VAT" if pl_vat == "EXEMPT" else "VAT"
+
     offer: dict = {
-        "name":       product_data["name"][:75],
-        "category":   {"id": category_id},
-        "parameters": parameters,
+        "name":     product_data["name"][:75],
+        "category": {"id": category_id},
         "description": {
             "sections": [{"items": [{"type": "TEXT", "content": description_html}]}]
         },
@@ -859,7 +859,7 @@ def publish_to_allegro(user: User, product_data: dict,
             "price":  {"amount": f"{price:.2f}", "currency": "PLN"},
         },
         "stock":    {"available": stock, "unit": "UNIT"},
-        "payments": {"invoice": "VAT"},
+        "payments": {"invoice": invoice},
         "location": {
             "countryCode": "PL",
             "province":    s.allegro_province,
@@ -872,16 +872,9 @@ def publish_to_allegro(user: User, product_data: dict,
     if shipping_rate_id:
         offer["delivery"]["shippingRates"] = {"id": shipping_rate_id}
 
-    # VAT invoice type — derived from user's Poland VAT selection
-    vat     = opts.get("vat", {})
-    pl_vat  = vat.get("pl", "23")
-    invoice = "WITHOUT_VAT" if pl_vat == "EXEMPT" else "VAT"
-    offer["payments"] = {"invoice": invoice}
-
-    # Allegro Ads — correct field: promotion.highlighted (not emphasize)
-    ads = opts.get("ads", {})
-    if ads.get("pl") or ads.get("cz"):
-        offer["promotion"] = {"highlighted": True, "bold": False, "departmentPage": False}
+    # Only attach parameters when non-empty
+    if parameters:
+        offer["parameters"] = parameters
 
     image_upload_errors = []
     allegro_image_urls, image_upload_errors = _upload_images_to_allegro(
@@ -893,13 +886,14 @@ def publish_to_allegro(user: User, product_data: dict,
         offer["images"] = allegro_image_urls
         app.logger.info("Allegro offer images: %s", allegro_image_urls)
 
+    app.logger.info("Allegro offer payload: %s", json.dumps(offer, ensure_ascii=False)[:2000])
     resp = requests.post(
         f"{ALLEGRO_API_BASE}/sale/product-offers",
         headers=_allegro_bearer_headers(access_token),
         json=offer,
         timeout=20,
     )
-    app.logger.info("Allegro POST /sale/product-offers → %s: %s", resp.status_code, resp.text[:600])
+    app.logger.info("Allegro POST /sale/product-offers → %s: %s", resp.status_code, resp.text[:1000])
 
     if resp.ok:
         data      = resp.json()
