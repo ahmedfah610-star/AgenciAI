@@ -552,44 +552,72 @@ def _get_valid_access_token(user: User) -> str | None:
 
 # ─── 7. ALLEGRO OFFER HELPERS ─────────────────────────────────────────────────
 
-def _upload_images_to_allegro(access_token: str, image_urls: list[str]) -> tuple[list[str], list[str]]:
+def _allegro_upload_raw(access_token: str, index: int,
+                         data: bytes, content_type: str) -> tuple[str, str | None]:
+    """Upload raw image bytes to Allegro CDN. Returns (cdn_url, error)."""
+    app.logger.info("Allegro img %d upload — %s, %d bytes", index + 1, content_type, len(data))
+    up_resp = requests.post(
+        f"{ALLEGRO_UPLOAD_BASE}/sale/images",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type":  content_type,
+            "Accept":        "application/vnd.allegro.public.v1+json",
+        },
+        data=data,
+        timeout=60,
+    )
+    if up_resp.ok:
+        cdn_url = up_resp.json().get("location", "")
+        if cdn_url:
+            app.logger.info("Allegro img %d OK: %s", index + 1, cdn_url)
+            return cdn_url, None
+        return "", f"Zdjęcie {index+1}: brak 'location' w odpowiedzi"
+    err = f"Zdjęcie {index+1}: upload {up_resp.status_code} — {up_resp.text[:200]}"
+    app.logger.warning(err)
+    return "", err
+
+
+def _upload_images_to_allegro(access_token: str,
+                               image_urls: list[str] | None = None,
+                               image_bytes_list: list[tuple[bytes, str]] | None = None,
+                               ) -> tuple[list[str], list[str]]:
+    """Upload images to Allegro CDN from URLs or raw bytes (fallback)."""
     allegro_urls = []
     errors       = []
-    for i, url in enumerate(image_urls):
+    idx          = 0
+
+    for url in (image_urls or []):
         if not url:
             continue
         try:
             img_resp     = requests.get(url, timeout=30)
             img_resp.raise_for_status()
             content_type = img_resp.headers.get("Content-Type", "image/jpeg").split(";")[0].strip()
-            app.logger.info("Allegro img upload — content_type: %s, size: %d bytes",
-                            content_type, len(img_resp.content))
-            up_resp = requests.post(
-                f"{ALLEGRO_UPLOAD_BASE}/sale/images",
-                headers={
-                    "Authorization": f"Bearer {access_token}",
-                    "Content-Type":  content_type,
-                    "Accept":        "application/vnd.allegro.public.v1+json",
-                },
-                data=img_resp.content,
-                timeout=60,
-            )
-            if up_resp.ok:
-                cdn_url = up_resp.json().get("location", "")
+            cdn_url, err = _allegro_upload_raw(access_token, idx, img_resp.content, content_type)
+            if cdn_url:
+                allegro_urls.append(cdn_url)
+            elif err:
+                errors.append(err)
+        except Exception as e:
+            errors.append(f"Zdjęcie {idx+1}: {type(e).__name__}: {e}")
+            app.logger.warning("Allegro img %d from URL failed: %s", idx + 1, e)
+        idx += 1
+
+    # If no images uploaded via URL, try direct bytes upload
+    if not allegro_urls and image_bytes_list:
+        for raw_bytes, mime in image_bytes_list:
+            try:
+                cdn_url, err = _allegro_upload_raw(access_token, idx, raw_bytes,
+                                                    mime or "image/jpeg")
                 if cdn_url:
                     allegro_urls.append(cdn_url)
-                    app.logger.info("Allegro img %d OK: %s", i + 1, cdn_url)
-                else:
-                    err = f"Zdjęcie {i+1}: brak 'location' w odpowiedzi"
+                elif err:
                     errors.append(err)
-            else:
-                err = f"Zdjęcie {i+1}: upload {up_resp.status_code} — {up_resp.text[:200]}"
-                errors.append(err)
-                app.logger.warning(err)
-        except Exception as e:
-            err = f"Zdjęcie {i+1}: {type(e).__name__}: {e}"
-            errors.append(err)
-            app.logger.warning(err)
+            except Exception as e:
+                errors.append(f"Zdjęcie {idx+1}: {type(e).__name__}: {e}")
+                app.logger.warning("Allegro img %d direct upload failed: %s", idx + 1, e)
+            idx += 1
+
     return allegro_urls, errors
 
 
@@ -628,15 +656,27 @@ def _get_allegro_shipping_rate_id(access_token: str) -> str | None:
     return None
 
 
-def _find_allegro_category(access_token: str, category_name: str) -> str | None:
-    """Find Allegro category by name. Falls back to 'Inne', then first available."""
+def _find_allegro_category(access_token: str, category_name: str,
+                           product_name: str = "") -> str | None:
+    """Find best Allegro leaf category. Uses matching-categories first (most accurate)."""
     headers = _allegro_bearer_headers(access_token)
 
-    def _search(name: str) -> str | None:
+    # 1. matching-categories by product name — most semantic, Allegro recommends this
+    if product_name:
+        resp = requests.get(f"{ALLEGRO_API_BASE}/sale/matching-categories",
+                            headers=headers, params={"name": product_name}, timeout=10)
+        if resp.ok:
+            cats = resp.json().get("matchingCategories", [])
+            if cats:
+                app.logger.info("Allegro matching-categories found: %s", cats[0]["id"])
+                return str(cats[0]["id"])
+
+    def _search_by_name(name: str) -> str | None:
         resp = requests.get(f"{ALLEGRO_API_BASE}/sale/categories",
                             headers=headers, params={"name": name}, timeout=10)
         if resp.ok:
             cats = resp.json().get("categories", [])
+            # prefer leaf categories
             for cat in cats:
                 if cat.get("leaf"):
                     return str(cat["id"])
@@ -644,17 +684,17 @@ def _find_allegro_category(access_token: str, category_name: str) -> str | None:
                 return str(cats[0]["id"])
         return None
 
-    # 1. Try AI-suggested category
-    cat_id = _search(category_name)
+    # 2. AI-suggested category name
+    cat_id = _search_by_name(category_name)
     if cat_id:
         return cat_id
 
-    # 2. Fallback: "Inne"
-    cat_id = _search("Inne")
+    # 3. Fallback: "Inne"
+    cat_id = _search_by_name("Inne")
     if cat_id:
         return cat_id
 
-    # 3. Last resort: first root category
+    # 4. Last resort: first root category
     resp = requests.get(f"{ALLEGRO_API_BASE}/sale/categories",
                         headers=headers, timeout=10)
     if resp.ok:
@@ -665,13 +705,90 @@ def _find_allegro_category(access_token: str, category_name: str) -> str | None:
     return None
 
 
-def publish_to_allegro(user: User, product_data: dict, image_urls: list[str] = None) -> dict:
+def _fill_allegro_parameters(access_token: str, category_id: str,
+                              features: dict) -> list:
+    """Fetch required/available parameters for category and fill from product features."""
+    if not features:
+        return []
+    headers = _allegro_bearer_headers(access_token)
+    resp = requests.get(
+        f"{ALLEGRO_API_BASE}/sale/categories/{category_id}/parameters",
+        headers=headers, timeout=10,
+    )
+    if not resp.ok:
+        app.logger.warning("Could not fetch parameters for category %s: %s",
+                           category_id, resp.text[:200])
+        return []
+
+    params_def = resp.json().get("parameters", [])
+    result = []
+    features_lower = {k.lower(): v for k, v in features.items()}
+
+    for param in params_def:
+        param_id      = param.get("id")
+        param_name    = param.get("name", "")
+        param_type    = param.get("type", "")
+        restrictions  = param.get("restrictions", {})
+
+        # Match parameter name against feature keys (case-insensitive)
+        matched_val = features.get(param_name) or features_lower.get(param_name.lower())
+        if not matched_val:
+            continue
+
+        matched_val_str = str(matched_val).strip()
+        if not matched_val_str:
+            continue
+
+        try:
+            if param_type == "dictionary":
+                dict_values = param.get("dictionaryValues", [])
+                mv_lower    = matched_val_str.lower()
+                found_id    = None
+                # exact match first
+                for dv in dict_values:
+                    if dv["value"].lower() == mv_lower:
+                        found_id = dv["id"]
+                        break
+                # partial match
+                if not found_id:
+                    for dv in dict_values:
+                        dv_lower = dv["value"].lower()
+                        if mv_lower in dv_lower or dv_lower in mv_lower:
+                            found_id = dv["id"]
+                            break
+                if found_id:
+                    result.append({"id": param_id, "valuesIds": [found_id],
+                                   "values": [], "rangeValue": None})
+            elif param_type == "string":
+                max_len = restrictions.get("maxLength", 200)
+                result.append({"id": param_id, "values": [matched_val_str[:max_len]],
+                               "valuesIds": [], "rangeValue": None})
+            elif param_type in ("integer", "float"):
+                val = str(int(float(matched_val_str)) if param_type == "integer"
+                          else round(float(matched_val_str), 2))
+                result.append({"id": param_id, "values": [val],
+                               "valuesIds": [], "rangeValue": None})
+        except Exception as e:
+            app.logger.debug("Parameter %s (%s) fill error: %s", param_name, param_type, e)
+
+    app.logger.info("Allegro parameters filled: %d / %d", len(result), len(params_def))
+    return result
+
+
+def publish_to_allegro(user: User, product_data: dict,
+                       image_urls: list[str] | None = None,
+                       image_bytes_list: list[tuple[bytes, str]] | None = None,
+                       features: dict | None = None) -> dict:
     s            = _ensure_settings(user)
     access_token = _get_valid_access_token(user)
     if not access_token:
         return {"error": "Nie zalogowano do Allegro — kliknij 'Autoryzuj Allegro'."}
 
-    category_id = _find_allegro_category(access_token, product_data.get("category", "Inne"))
+    category_id = _find_allegro_category(
+        access_token,
+        product_data.get("category", "Inne"),
+        product_name=product_data.get("name", ""),
+    )
     if not category_id:
         return {"error": "Nie znaleziono kategorii Allegro. Ustaw domyślną kategorię w Ustawieniach."}
 
@@ -687,10 +804,13 @@ def publish_to_allegro(user: User, product_data: dict, image_urls: list[str] = N
         product_data.get("description") or f"<p>{product_data.get('short_description', '')}</p>"
     )
 
+    # Fill parameters from detected features
+    parameters = _fill_allegro_parameters(access_token, category_id, features or {})
+
     offer: dict = {
-        "name":     product_data["name"][:75],
-        "category": {"id": category_id},
-        "parameters": [],
+        "name":       product_data["name"][:75],
+        "category":   {"id": category_id},
+        "parameters": parameters,
         "description": {
             "sections": [{"items": [{"type": "TEXT", "content": description_html}]}]
         },
@@ -713,11 +833,14 @@ def publish_to_allegro(user: User, product_data: dict, image_urls: list[str] = N
         offer["delivery"]["shippingRates"] = {"id": shipping_rate_id}
 
     image_upload_errors = []
-    if image_urls:
-        allegro_image_urls, image_upload_errors = _upload_images_to_allegro(access_token, image_urls[:5])
-        if allegro_image_urls:
-            offer["images"] = allegro_image_urls
-            app.logger.info("Allegro offer images: %s", allegro_image_urls)
+    allegro_image_urls, image_upload_errors = _upload_images_to_allegro(
+        access_token,
+        image_urls=(image_urls or [])[:5],
+        image_bytes_list=(image_bytes_list or [])[:5],
+    )
+    if allegro_image_urls:
+        offer["images"] = allegro_image_urls
+        app.logger.info("Allegro offer images: %s", allegro_image_urls)
 
     resp = requests.post(
         f"{ALLEGRO_API_BASE}/sale/product-offers",
@@ -814,22 +937,35 @@ def publish():
     s      = _ensure_settings()
     result = {"success": True, "woocommerce": None, "allegro": None}
 
+    # Parse features from form (sent as JSON string)
+    features_raw = request.form.get("features", "{}")
+    try:
+        features = json.loads(features_raw) if features_raw else {}
+    except Exception:
+        features = {}
+
+    # Read all image files into memory first (so we can use them for both WP and Allegro)
+    raw_images: list[tuple[bytes, str, str]] = []  # (bytes, mime, filename_stem)
+    for i, f in enumerate(request.files.getlist("images")):
+        if f and f.filename:
+            data      = f.read()
+            mime      = f.content_type or "image/jpeg"
+            stem      = re.sub(r"[^a-zA-Z0-9_-]", "-",
+                               os.path.splitext(f.filename)[0]) or f"product-{i+1}"
+            raw_images.append((data, mime, stem))
+
     # Upload images to WordPress
     image_ids  = []
     image_urls = []
-    for i, f in enumerate(request.files.getlist("images")):
-        if f and f.filename:
-            try:
-                image_b64  = base64.standard_b64encode(f.read()).decode()
-                media_type = f.content_type or "image/jpeg"
-                name       = re.sub(r"[^a-zA-Z0-9_-]", "-",
-                                    os.path.splitext(f.filename)[0]) or f"product-{i+1}"
-                media = upload_image_to_wordpress(s, image_b64, name, media_type)
-                image_ids.append(media["id"])
-                image_urls.append(media["url"])
-                app.logger.info("WP image uploaded: id=%s url=%s", media["id"], media["url"])
-            except Exception as e:
-                app.logger.warning("Image %d upload failed: %s", i, e)
+    for i, (data, mime, stem) in enumerate(raw_images):
+        try:
+            image_b64 = base64.standard_b64encode(data).decode()
+            media     = upload_image_to_wordpress(s, image_b64, stem, mime)
+            image_ids.append(media["id"])
+            image_urls.append(media["url"])
+            app.logger.info("WP image uploaded: id=%s url=%s", media["id"], media["url"])
+        except Exception as e:
+            app.logger.warning("Image %d WP upload failed: %s", i, e)
 
     result["images_uploaded"] = len(image_ids)
     result["image_urls"]      = image_urls
@@ -854,7 +990,14 @@ def publish():
             result["woocommerce"] = {"success": False, "error": f"{type(e).__name__}: {e}"}
 
     if "allegro" in targets:
-        result["allegro"] = publish_to_allegro(current_user, product_data, image_urls)
+        # Pass raw bytes as fallback when WP image upload failed (no image_urls)
+        image_bytes_list = [(d, m) for d, m, _ in raw_images] if not image_urls else []
+        result["allegro"] = publish_to_allegro(
+            current_user, product_data,
+            image_urls=image_urls,
+            image_bytes_list=image_bytes_list,
+            features=features,
+        )
 
     wc_ok = result["woocommerce"] and result["woocommerce"].get("success")
     al_ok = result["allegro"]     and result["allegro"].get("success")

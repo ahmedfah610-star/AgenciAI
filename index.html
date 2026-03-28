@@ -774,6 +774,7 @@ let currentFiles = [];
 let tags = [];
 let allegroAuthorized = false;
 let allegroStatusFetched = false;
+let currentFeatures = {};
 
 // ─── Auth check on load ───────────────────────────────────────────────────────
 async function initAuth() {
@@ -964,6 +965,7 @@ analyzeBtn.addEventListener('click', async () => {
 
     if (!resp.ok || !data.success) throw new Error(data.error || 'Unknown error');
 
+    currentFeatures = data.features || {};
     populateForm(data.product);
     document.getElementById('empty-state').style.display = 'none';
     document.getElementById('product-form').classList.add('visible');
@@ -1206,6 +1208,7 @@ document.getElementById('publish-btn').addEventListener('click', async () => {
   const formData = new FormData();
   formData.append('product', JSON.stringify(product));
   formData.append('targets', JSON.stringify(targets));
+  formData.append('features', JSON.stringify(currentFeatures));
   currentFiles.forEach(f => formData.append('images', f));
 
   publishBtn.disabled = true;
