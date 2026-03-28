@@ -21,7 +21,7 @@ def init_models(db):
 
         id              = db.Column(db.String(36), primary_key=True, default=gen_uuid)
         user_id         = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-        bot_name        = db.Column(db.String(100), default='Asystent')
+        bot_name        = db.Column(db.String(100), default='Specjalista ds. obsługi klienta')
         primary_color   = db.Column(db.String(7), default='#0071e3')
         welcome_message = db.Column(db.Text, default='Cześć! W czym mogę pomóc?')
         system_prompt   = db.Column(db.Text, default='Jesteś pomocnym asystentem obsługi klienta.')
