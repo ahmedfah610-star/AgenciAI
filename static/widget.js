@@ -52,7 +52,7 @@
 
     #cs-widget {
       position: fixed; ${POSITION}: 24px; bottom: 24px;
-      width: 360px; max-height: 560px; height: auto;
+      width: 360px; height: 520px;
       background: #fff; border-radius: 16px;
       box-shadow: 0 8px 40px rgba(0,0,0,0.18);
       display: flex; flex-direction: column;
