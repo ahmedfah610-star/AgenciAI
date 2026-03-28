@@ -18,6 +18,25 @@ chatbot_bp = Blueprint('chatbot', __name__, url_prefix='/chatbot')
 UPLOAD_FOLDER = os.getenv('UPLOAD_DIR', './uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+CORS_HEADERS = {
+    'Access-Control-Allow-Origin':  '*',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Api-Key',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+}
+
+@chatbot_bp.after_request
+def add_cors(response):
+    for k, v in CORS_HEADERS.items():
+        response.headers[k] = v
+    return response
+
+@chatbot_bp.route('/api/<path:path>', methods=['OPTIONS'])
+@chatbot_bp.route('/api/message', methods=['OPTIONS'])
+@chatbot_bp.route('/api/config', methods=['OPTIONS'])
+@chatbot_bp.route('/api/feedback', methods=['OPTIONS'])
+def handle_options(path=''):
+    return Response('', status=204, headers=CORS_HEADERS)
+
 
 # ── Helpers ───────────────────────────────────────────────────
 

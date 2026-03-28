@@ -52,7 +52,7 @@
 
     #cs-widget {
       position: fixed; ${POSITION}: 24px; bottom: 96px;
-      width: 380px; max-height: 600px; height: 80vh;
+      width: 360px; max-height: 520px; height: auto;
       background: #fff; border-radius: 16px;
       box-shadow: 0 8px 40px rgba(0,0,0,0.18);
       display: flex; flex-direction: column;
@@ -222,14 +222,14 @@
   function openWidget() {
     isOpen = true;
     document.getElementById('cs-widget').classList.add('cs-open');
-    document.getElementById('cs-widget-btn').innerHTML = closeIcon();
+    document.getElementById('cs-widget-btn').style.display = 'none';
     setTimeout(() => document.getElementById('cs-input')?.focus(), 250);
   }
 
   function closeWidget() {
     isOpen = false;
     document.getElementById('cs-widget').classList.remove('cs-open');
-    document.getElementById('cs-widget-btn').innerHTML = chatIcon();
+    document.getElementById('cs-widget-btn').style.display = 'flex';
   }
 
   // ── Messaging ──────────────────────────────────────────────
