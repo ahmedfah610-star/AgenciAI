@@ -791,10 +791,24 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
         )
         raw = ai_resp.content[0].text.strip()
         raw = re.sub(r"^```(?:json)?|```$", "", raw, flags=re.MULTILINE).strip()
-        result = json.loads(raw)
-        if isinstance(result, list):
-            app.logger.info("Allegro AI parameters filled: %d items", len(result))
-            return result
+        raw_list = json.loads(raw)
+        if not isinstance(raw_list, list):
+            return []
+        # Sanitize: only Allegro-allowed fields per parameter
+        result = []
+        for item in raw_list:
+            if not isinstance(item, dict) or not item.get("id"):
+                continue
+            clean: dict = {"id": str(item["id"])}
+            if item.get("valuesIds") and isinstance(item["valuesIds"], list):
+                clean["valuesIds"] = [str(v) for v in item["valuesIds"] if v]
+            elif item.get("values") and isinstance(item["values"], list):
+                clean["values"] = [str(v) for v in item["values"] if v is not None]
+            else:
+                continue  # skip params without any value
+            result.append(clean)
+        app.logger.info("Allegro AI parameters filled: %d items", len(result))
+        return result
     except Exception as e:
         app.logger.warning("AI parameter fill failed: %s", e)
 
@@ -881,12 +895,9 @@ def publish_to_allegro(user: User, product_data: dict,
     if shipping_rate_id:
         offer["delivery"]["shippingRates"] = {"id": shipping_rate_id}
 
-    # Fulfillment — always set explicitly so Allegro doesn't ask seller manually
-    fulfillment_choice = opts.get("fulfillment", "SELF")
-    offer["fulfillment"] = {
-        "availabilityCode": "ONE_FULFILLMENT" if fulfillment_choice == "ONE_FULFILLMENT"
-                            else "NOT_AVAILABLE"
-    }
+    # Fulfillment — only send for ONE_FULFILLMENT; omitting = Allegro treats as self-managed
+    if opts.get("fulfillment") == "ONE_FULFILLMENT":
+        offer["fulfillment"] = {"availabilityCode": "ONE_FULFILLMENT"}
 
     # Parameters (VAT + product features matched to category params)
     if parameters:
@@ -923,11 +934,16 @@ def publish_to_allegro(user: User, product_data: dict,
     try:
         err_body = resp.json()
         errors   = err_body.get("errors", [])
-        msg = ("; ".join(f"[{e.get('code','?')}] {e.get('message','?')} (path: {e.get('path','?')})"
-                         for e in errors)
-               if errors else json.dumps(err_body)[:500])
+        def _fmt(e):
+            parts = [f"[{e.get('code','?')}] {e.get('message','?')}"]
+            if e.get("path"):  parts.append(f"path={e['path']}")
+            if e.get("details"): parts.append(f"details={e['details']}")
+            if e.get("userMessage"): parts.append(f"userMsg={e['userMessage']}")
+            return " | ".join(parts)
+        msg = ("; ".join(_fmt(e) for e in errors)
+               if errors else json.dumps(err_body)[:800])
     except Exception:
-        msg = resp.text[:500]
+        msg = resp.text[:800]
     return {"error": f"Allegro {resp.status_code}: {msg}"}
 
 
