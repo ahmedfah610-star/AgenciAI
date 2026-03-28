@@ -935,13 +935,18 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
                 continue
 
         # ── Everything else: only offer-scope params go to Claude ──
-        offer_scope = (
-            p.get("offerScope")
-            or p.get("options", {}).get("offerScope")
-            or p.get("restrictions", {}).get("offerScope")
-        )
-        if offer_scope is False:
-            continue  # skip non-priority product-scope params for Claude
+        # NOTE: cannot use `or` chain — False or None = None, not False!
+        def _offer_scope(param):
+            for val in [
+                param.get("offerScope"),
+                param.get("options", {}).get("offerScope"),
+                param.get("restrictions", {}).get("offerScope"),
+            ]:
+                if val is not None:
+                    return val
+            return None
+        if _offer_scope(p) is False:
+            continue  # skip product-catalog-only params for Claude
 
         entry: dict = {"id": param_id, "name": param_name, "type": ptype,
                        "required": p.get("required", False)}
