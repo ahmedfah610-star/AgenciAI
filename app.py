@@ -750,13 +750,20 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
     if not params_def:
         return []
 
-    # Build compact param list for Claude — include allowed values for dictionary types
+    # Build compact param list for Claude
+    # For dictionary params: expose {valueId, label} explicitly so Claude can't confuse them
     params_for_ai = []
+    # Also keep a lookup: param_id -> set of valid valueIds for post-validation
+    valid_value_ids: dict[str, set] = {}
+
     for p in params_def:
         entry: dict = {"id": p["id"], "name": p["name"], "type": p["type"],
                        "required": p.get("required", False)}
         if p.get("dictionaryValues"):
-            entry["allowed"] = [[v["id"], v["value"]] for v in p["dictionaryValues"][:40]]
+            opts_list = [{"valueId": v["id"], "label": v["value"]}
+                         for v in p["dictionaryValues"][:40]]
+            entry["options"] = opts_list
+            valid_value_ids[p["id"]] = {v["id"] for v in p["dictionaryValues"]}
         if p.get("restrictions", {}).get("maxLength"):
             entry["maxLength"] = p["restrictions"]["maxLength"]
         params_for_ai.append(entry)
@@ -766,21 +773,21 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
         merged_features.setdefault("Stawka VAT", f"{vat_rate}%")
 
     prompt = (
-        "You are filling in Allegro listing parameters for a Polish e-commerce offer.\n\n"
+        "Fill Allegro listing parameters for a Polish e-commerce product.\n\n"
         f"Product name: {product_name}\n"
         f"Short description: {product_description[:400]}\n"
         f"Detected features: {json.dumps(merged_features, ensure_ascii=False)}\n\n"
-        "Available category parameters:\n"
+        "Parameters to fill:\n"
         f"{json.dumps(params_for_ai, ensure_ascii=False)[:4000]}\n\n"
-        "Rules:\n"
-        "- dictionary type: pick the EXACT value id from 'allowed' list — use [id, value] pairs\n"
-        "- string type: write appropriate Polish text\n"
-        "- integer/float type: write just the number as string\n"
-        "- Only fill parameters you are confident about\n"
-        "- For 'Stawka VAT' always use the value from detected features if present\n\n"
-        "Respond ONLY with a JSON array, no markdown:\n"
-        '[{"id": "param_id", "valuesIds": ["value_id"]}, '
-        '{"id": "param_id2", "values": ["text"]}, ...]'
+        "CRITICAL RULES:\n"
+        "1. For 'dictionary' type: use ONLY the 'valueId' field from the 'options' list.\n"
+        "   NEVER use the 'label'. Example: if options=[{valueId:'11323_1',label:'Nowy'}]\n"
+        "   then output: {\"id\":\"11323\",\"valuesIds\":[\"11323_1\"]}\n"
+        "2. For 'string' type: {\"id\":\"...\",\"values\":[\"Polish text\"]}\n"
+        "3. For 'integer'/'float' type: {\"id\":\"...\",\"values\":[\"42\"]}\n"
+        "4. Only include parameters you can confidently fill.\n"
+        "5. Respond ONLY with a JSON array — no markdown, no explanation.\n\n"
+        "Output format: [{\"id\":\"param_id\",\"valuesIds\":[\"valueId\"]}, ...]"
     )
 
     try:
@@ -794,20 +801,33 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
         raw_list = json.loads(raw)
         if not isinstance(raw_list, list):
             return []
-        # Sanitize: only Allegro-allowed fields per parameter
+
         result = []
         for item in raw_list:
             if not isinstance(item, dict) or not item.get("id"):
                 continue
-            clean: dict = {"id": str(item["id"])}
+            param_id = str(item["id"])
+            clean: dict = {"id": param_id}
+
             if item.get("valuesIds") and isinstance(item["valuesIds"], list):
-                clean["valuesIds"] = [str(v) for v in item["valuesIds"] if v]
+                # Validate each valueId against known allowed IDs — drop invalid ones
+                allowed = valid_value_ids.get(param_id, set())
+                valid = [str(v) for v in item["valuesIds"]
+                         if v and (not allowed or str(v) in allowed)]
+                if not valid:
+                    app.logger.warning("Param %s: all valuesIds invalid %s", param_id, item["valuesIds"])
+                    continue
+                clean["valuesIds"] = valid
             elif item.get("values") and isinstance(item["values"], list):
                 clean["values"] = [str(v) for v in item["values"] if v is not None]
+                if not clean["values"]:
+                    continue
             else:
-                continue  # skip params without any value
+                continue
+
             result.append(clean)
-        app.logger.info("Allegro AI parameters filled: %d items", len(result))
+
+        app.logger.info("Allegro AI parameters filled: %d / %d params", len(result), len(params_def))
         return result
     except Exception as e:
         app.logger.warning("AI parameter fill failed: %s", e)
