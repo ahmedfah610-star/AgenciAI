@@ -902,40 +902,8 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
         ptype      = p["type"]
         dict_vals  = p.get("dictionaryValues", [])
 
-        # ── Direct handling for Marka, Rozmiar, Kolor, Stan ──
-        # NOTE: we include ALL params regardless of offerScope —
-        # /sale/product-offers handles routing to product vs offer automatically.
-        user_val = _DIRECT_MAP.get(param_name, "")
-        if user_val:
-            app.logger.info("Direct param [%s] type=%s dict_vals=%d user_val=%s",
-                            param_name, ptype, len(dict_vals), user_val)
-            if ptype == "string":
-                direct_results.append({"id": param_id, "values": [user_val]})
-                direct_param_ids.add(param_id)
-                app.logger.info("→ string set: %s = %s", param_name, user_val)
-                continue
-            elif ptype == "dictionary":
-                if dict_vals:
-                    best_id = _fuzzy_match_value(user_val, dict_vals)
-                    if best_id:
-                        direct_results.append({"id": param_id, "valuesIds": [best_id]})
-                        direct_param_ids.add(param_id)
-                        app.logger.info("→ dict matched: %s = valueId %s", param_name, best_id)
-                        continue
-                    else:
-                        app.logger.warning("→ dict NO MATCH for %s=%s in %d values (sample: %s)",
-                                           param_name, user_val, len(dict_vals),
-                                           [v["value"] for v in dict_vals[:5]])
-                else:
-                    app.logger.warning("→ dict EMPTY values for %s, trying string fallback", param_name)
-                # Fallback: send as open text value (works for open-dictionary params)
-                direct_results.append({"id": param_id, "values": [user_val]})
-                direct_param_ids.add(param_id)
-                app.logger.info("→ dict fallback to values[]: %s = %s", param_name, user_val)
-                continue
-
-        # ── Everything else: only offer-scope params go to Claude ──
-        # Check every known location where Allegro stores offerScope
+        # ── offerScope check FIRST for every param ──
+        # offerScope=False → product-catalog only, cannot be in offer → skip always
         raw_scope = None
         for candidate in [
             p.get("offerScope"),
@@ -945,10 +913,33 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
             if candidate is not None:
                 raw_scope = candidate
                 break
-        app.logger.info("Param %s (%s): offerScope raw=%r → skip=%s",
-                        param_name, param_id, raw_scope, raw_scope is False)
         if raw_scope is False:
-            continue  # skip product-catalog-only params
+            if param_name in _DIRECT_MAP and _DIRECT_MAP[param_name]:
+                app.logger.info("Param %s (%s): offerScope=False, skipping even though user provided value",
+                                param_name, param_id)
+            continue  # skip product-catalog-only params — no exceptions
+
+        # ── Direct handling for Marka, Rozmiar, Kolor, Stan (only if offerScope allows) ──
+        user_val = _DIRECT_MAP.get(param_name, "")
+        if user_val:
+            if ptype == "string":
+                direct_results.append({"id": param_id, "values": [user_val]})
+                direct_param_ids.add(param_id)
+                app.logger.info("Direct string: %s=%s", param_name, user_val)
+                continue
+            elif ptype == "dictionary":
+                if dict_vals:
+                    best_id = _fuzzy_match_value(user_val, dict_vals)
+                    if best_id:
+                        direct_results.append({"id": param_id, "valuesIds": [best_id]})
+                        direct_param_ids.add(param_id)
+                        app.logger.info("Direct dict: %s=%s → %s", param_name, user_val, best_id)
+                        continue
+                # No match found — try as open text
+                direct_results.append({"id": param_id, "values": [user_val]})
+                direct_param_ids.add(param_id)
+                app.logger.info("Direct dict fallback: %s=%s", param_name, user_val)
+                continue
 
         entry: dict = {"id": param_id, "name": param_name, "type": ptype,
                        "required": p.get("required", False)}
