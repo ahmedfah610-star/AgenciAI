@@ -669,6 +669,100 @@ def _sanitize_allegro_html(html: str) -> str:
     return html.strip()
 
 
+def _get_allegro_tax_settings(access_token: str, category_id: str) -> list:
+    """
+    Fetch valid tax settings for a category from /sale/tax-settings.
+    Returns list of dicts: [{rate, countryCode, subject, id?}, ...]
+    """
+    resp = requests.get(
+        f"{ALLEGRO_API_BASE}/sale/tax-settings",
+        headers=_allegro_bearer_headers(access_token),
+        params={"categoryId": category_id},
+        timeout=10,
+    )
+    if not resp.ok:
+        app.logger.warning("Could not fetch tax-settings: %s %s", resp.status_code, resp.text[:200])
+        return []
+    data = resp.json()
+    # API can return either "taxSettings" array or nested structure
+    settings = data.get("taxSettings") or data.get("rates") or []
+    app.logger.info("Allegro tax-settings raw: %s", json.dumps(data)[:500])
+    return settings
+
+
+def _build_tax_rates(access_token: str, category_id: str, vat: dict) -> dict | None:
+    """
+    Build taxSettings payload using rates validated against /sale/tax-settings.
+    vat = {"pl": "23", "sk": "20", "hu": "27", "cz": "21"}
+    Returns taxSettings dict or None if nothing to set.
+    """
+    _country_map = {"pl": "PL", "sk": "SK", "hu": "HU", "cz": "CZ"}
+
+    # Try to get valid settings from API
+    api_settings = _get_allegro_tax_settings(access_token, category_id)
+    app.logger.info("Allegro tax-settings parsed: %s", api_settings)
+
+    tax_rates = []
+    default_subject = "PRODUCT"
+
+    if api_settings:
+        # API returned valid settings — match user-chosen rates to allowed values
+        # Structure can vary; extract available rates
+        for vat_key, country_code in _country_map.items():
+            rate_val = vat.get(vat_key, "")
+            if not rate_val or rate_val in ("EXEMPT", "0", ""):
+                continue
+            try:
+                desired = float(str(rate_val).replace("%", "").strip())
+            except (ValueError, TypeError):
+                continue
+
+            # Look for matching rate in api_settings
+            best_match = None
+            best_diff = 999
+
+            # api_settings can be a flat list or nested by country/subject
+            for s in api_settings:
+                # Try different field names
+                s_rate = s.get("rate") or s.get("percentage") or s.get("value") or ""
+                s_country = s.get("countryCode") or s.get("country") or ""
+                s_subject = s.get("subject") or "PRODUCT"
+                try:
+                    diff = abs(float(str(s_rate).replace("%", "")) - desired)
+                    country_match = (not s_country) or (s_country.upper() == country_code)
+                    if country_match and diff < best_diff:
+                        best_diff = diff
+                        best_match = {"rate": str(s_rate), "countryCode": country_code,
+                                      "subject": s_subject}
+                        default_subject = s_subject
+                except (ValueError, TypeError):
+                    pass
+
+            if best_match:
+                tax_rates.append(best_match)
+            else:
+                # No matching rate from API — use user value as-is
+                tax_rates.append({"rate": f"{desired:.2f}", "countryCode": country_code})
+    else:
+        # No API data — build from user input directly
+        for vat_key, country_code in _country_map.items():
+            rate_val = vat.get(vat_key, "")
+            if not rate_val or rate_val in ("EXEMPT", "0", ""):
+                continue
+            try:
+                rate_num = float(str(rate_val).replace("%", "").strip())
+                tax_rates.append({"rate": f"{rate_num:.2f}", "countryCode": country_code})
+            except (ValueError, TypeError):
+                pass
+
+    if not tax_rates:
+        return None
+
+    # Simplify: remove countryCode if only one rate (some APIs don't want it per-country here)
+    result = {"rates": tax_rates, "subject": default_subject}
+    return result
+
+
 def _get_allegro_shipping_rate_id(access_token: str) -> str | None:
     resp = requests.get(
         f"{ALLEGRO_API_BASE}/sale/shipping-rates",
@@ -903,18 +997,8 @@ def publish_to_allegro(user: User, product_data: dict,
 
     invoice = "WITHOUT_VAT" if pl_vat == "EXEMPT" else "VAT"
 
-    # Build taxSettings.rates for each country that has a non-exempt VAT rate
-    _country_map = {"pl": "PL", "sk": "SK", "hu": "HU", "cz": "CZ"}
-    tax_rates = []
-    for vat_key, country_code in _country_map.items():
-        rate_val = vat.get(vat_key, "")
-        if rate_val and rate_val not in ("EXEMPT", "0", ""):
-            try:
-                # Normalize to "23.00" format
-                rate_num = float(str(rate_val).replace("%", "").strip())
-                tax_rates.append({"rate": f"{rate_num:.2f}", "countryCode": country_code})
-            except (ValueError, TypeError):
-                pass
+    # Build taxSettings from valid API rates
+    tax_settings = _build_tax_rates(access_token, category_id, vat)
 
     offer: dict = {
         "name":     product_data["name"][:75],
@@ -941,11 +1025,9 @@ def publish_to_allegro(user: User, product_data: dict,
         offer["delivery"]["shippingRates"] = {"id": shipping_rate_id}
 
     # Tax settings — declare VAT rate per country
-    if tax_rates:
-        offer["taxSettings"] = {
-            "rates": tax_rates,
-            "subject": "GOODS",
-        }
+    if tax_settings:
+        offer["taxSettings"] = tax_settings
+        app.logger.info("Allegro taxSettings: %s", json.dumps(tax_settings))
 
     # Fulfillment — only send for ONE_FULFILLMENT; omitting = Allegro treats as self-managed
     if opts.get("fulfillment") == "ONE_FULFILLMENT":
