@@ -881,9 +881,12 @@ def publish_to_allegro(user: User, product_data: dict,
     if shipping_rate_id:
         offer["delivery"]["shippingRates"] = {"id": shipping_rate_id}
 
-    # One Fulfillment by Allegro (only when explicitly selected — SELF requires no field)
-    if opts.get("fulfillment") == "ONE_FULFILLMENT":
-        offer["fulfillment"] = {"availabilityCode": "ONE_FULFILLMENT"}
+    # Fulfillment — always set explicitly so Allegro doesn't ask seller manually
+    fulfillment_choice = opts.get("fulfillment", "SELF")
+    offer["fulfillment"] = {
+        "availabilityCode": "ONE_FULFILLMENT" if fulfillment_choice == "ONE_FULFILLMENT"
+                            else "NOT_AVAILABLE"
+    }
 
     # Parameters (VAT + product features matched to category params)
     if parameters:
