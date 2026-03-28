@@ -903,6 +903,19 @@ def publish_to_allegro(user: User, product_data: dict,
 
     invoice = "WITHOUT_VAT" if pl_vat == "EXEMPT" else "VAT"
 
+    # Build taxSettings.rates for each country that has a non-exempt VAT rate
+    _country_map = {"pl": "PL", "sk": "SK", "hu": "HU", "cz": "CZ"}
+    tax_rates = []
+    for vat_key, country_code in _country_map.items():
+        rate_val = vat.get(vat_key, "")
+        if rate_val and rate_val not in ("EXEMPT", "0", ""):
+            try:
+                # Normalize to "23.00" format
+                rate_num = float(str(rate_val).replace("%", "").strip())
+                tax_rates.append({"rate": f"{rate_num:.2f}", "countryCode": country_code})
+            except (ValueError, TypeError):
+                pass
+
     offer: dict = {
         "name":     product_data["name"][:75],
         "category": {"id": category_id},
@@ -926,6 +939,13 @@ def publish_to_allegro(user: User, product_data: dict,
     }
     if shipping_rate_id:
         offer["delivery"]["shippingRates"] = {"id": shipping_rate_id}
+
+    # Tax settings — declare VAT rate per country
+    if tax_rates:
+        offer["taxSettings"] = {
+            "rates": tax_rates,
+            "subject": "GOODS",
+        }
 
     # Fulfillment — only send for ONE_FULFILLMENT; omitting = Allegro treats as self-managed
     if opts.get("fulfillment") == "ONE_FULFILLMENT":
@@ -957,18 +977,30 @@ def publish_to_allegro(user: User, product_data: dict,
 
     resp = _post_offer(offer)
 
-    # If any parameter-related error → drop ALL parameters and retry once.
-    # Individual param removal is unreliable since Allegro reports one error at a time.
-    if resp.status_code == 422 and offer.get("parameters"):
+    # Retry logic for 422 errors — strip problematic fields one at a time
+    if resp.status_code == 422:
         try:
             errs = resp.json().get("errors", [])
+            # Drop parameters on parameter errors
             param_error = any(
                 e.get("path") == "parameters" or "parameter" in (e.get("code") or "").lower()
                 for e in errs
             )
-            if param_error:
+            if param_error and offer.get("parameters"):
                 app.logger.warning("Parameter errors — dropping all parameters and retrying")
                 offer.pop("parameters", None)
+                resp = _post_offer(offer)
+                errs = resp.json().get("errors", []) if resp.status_code == 422 else []
+
+            # Drop taxSettings on tax-related errors
+            tax_error = any(
+                "tax" in (e.get("code") or "").lower() or
+                (e.get("path") or "").startswith("taxSettings")
+                for e in errs
+            )
+            if resp.status_code == 422 and tax_error and offer.get("taxSettings"):
+                app.logger.warning("Tax settings error — dropping taxSettings and retrying")
+                offer.pop("taxSettings", None)
                 resp = _post_offer(offer)
         except Exception as retry_err:
             app.logger.warning("Retry failed: %s", retry_err)
