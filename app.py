@@ -852,117 +852,147 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
     if not params_def:
         return []
 
-    # Build compact param list for Claude
-    # For dictionary params: expose {valueId, label} explicitly so Claude can't confuse them
+    merged_features = dict(features or {})
+    if vat_rate and vat_rate != "EXEMPT":
+        merged_features.setdefault("Stawka VAT", f"{vat_rate}%")
+
+    # ── Key feature names that map to Allegro parameter names ──
+    # Polish param name → feature key
+    _DIRECT_MAP = {
+        "Marka":   merged_features.get("Marka", ""),
+        "Rozmiar": merged_features.get("Rozmiar", ""),
+        "Kolor":   merged_features.get("Kolor", ""),
+        "Stan":    merged_features.get("Stan", ""),
+    }
+
+    def _fuzzy_match_value(user_val: str, dict_values: list) -> str | None:
+        """Find best matching valueId from dictionaryValues for user_val (case-insensitive)."""
+        if not user_val or not dict_values:
+            return None
+        uv = user_val.strip().lower()
+        # 1. Exact match
+        for v in dict_values:
+            if v.get("value", "").lower() == uv:
+                return v["id"]
+        # 2. Starts-with match
+        for v in dict_values:
+            if v.get("value", "").lower().startswith(uv):
+                return v["id"]
+        # 3. Contains match
+        for v in dict_values:
+            if uv in v.get("value", "").lower():
+                return v["id"]
+        # 4. User value contains the dict entry
+        for v in dict_values:
+            label = v.get("value", "").lower()
+            if label and label in uv:
+                return v["id"]
+        return None
+
+    # Build compact param list for Claude (non-priority params)
     params_for_ai = []
-    # Also keep a lookup: param_id -> set of valid valueIds for post-validation
     valid_value_ids: dict[str, set] = {}
+    # Direct matches we handle ourselves (skip from Claude)
+    direct_results: list[dict] = []
+    direct_param_ids: set[str] = set()
 
     for p in params_def:
-        # Skip product-catalog parameters — they cannot be set at offer level.
-        # Allegro nests this flag under options.offerScope OR restrictions.offerScope
         offer_scope = (
             p.get("offerScope")
             or p.get("options", {}).get("offerScope")
             or p.get("restrictions", {}).get("offerScope")
         )
-        # offerScope=False means product-catalog only → skip
-        # offerScope=True or None/missing → include (assume offer-level is allowed)
         if offer_scope is False:
             continue
 
-        entry: dict = {"id": p["id"], "name": p["name"], "type": p["type"],
+        param_id  = str(p["id"])
+        param_name = p.get("name", "")
+        ptype      = p["type"]
+        dict_vals  = p.get("dictionaryValues", [])
+
+        # ── Direct handling for Marka, Rozmiar, Kolor, Stan ──
+        user_val = _DIRECT_MAP.get(param_name, "")
+        if user_val:
+            if ptype == "string":
+                direct_results.append({"id": param_id, "values": [user_val]})
+                direct_param_ids.add(param_id)
+                app.logger.info("Direct string param %s=%s → %s", param_name, user_val, param_id)
+                continue
+            elif ptype == "dictionary" and dict_vals:
+                best_id = _fuzzy_match_value(user_val, dict_vals)
+                if best_id:
+                    direct_results.append({"id": param_id, "valuesIds": [best_id]})
+                    direct_param_ids.add(param_id)
+                    app.logger.info("Direct dict param %s=%s → valueId=%s", param_name, user_val, best_id)
+                    continue
+
+        # ── Everything else goes to Claude ──
+        entry: dict = {"id": param_id, "name": param_name, "type": ptype,
                        "required": p.get("required", False)}
-        if p.get("dictionaryValues"):
-            opts_list = [{"valueId": v["id"], "label": v["value"]}
-                         for v in p["dictionaryValues"][:40]]
-            entry["options"] = opts_list
-            valid_value_ids[p["id"]] = {v["id"] for v in p["dictionaryValues"]}
+        if dict_vals:
+            entry["options"] = [{"valueId": v["id"], "label": v["value"]}
+                                 for v in dict_vals[:40]]
+            valid_value_ids[param_id] = {v["id"] for v in dict_vals}
         if p.get("restrictions", {}).get("maxLength"):
             entry["maxLength"] = p["restrictions"]["maxLength"]
         params_for_ai.append(entry)
 
-    merged_features = dict(features or {})
-    if vat_rate and vat_rate != "EXEMPT":
-        merged_features.setdefault("Stawka VAT", f"{vat_rate}%")
-
-    # Highlight key features the user explicitly provided
-    priority_hints = []
-    if merged_features.get("Marka"):
-        priority_hints.append(f"Brand/Marka: \"{merged_features['Marka']}\"")
-    if merged_features.get("Rozmiar"):
-        priority_hints.append(f"Size/Rozmiar: \"{merged_features['Rozmiar']}\"")
-    if merged_features.get("Kolor"):
-        priority_hints.append(f"Color/Kolor: \"{merged_features['Kolor']}\"")
-    priority_section = (
-        "\nPRIORITY — always fill these if matching parameter exists:\n" +
-        "\n".join(f"  - {h}" for h in priority_hints) + "\n"
-        if priority_hints else ""
-    )
-
-    prompt = (
-        "Fill Allegro listing parameters for a Polish e-commerce product.\n\n"
-        f"Product name: {product_name}\n"
-        f"Short description: {product_description[:400]}\n"
-        f"Detected features: {json.dumps(merged_features, ensure_ascii=False)}\n"
-        f"{priority_section}\n"
-        "Parameters to fill:\n"
-        f"{json.dumps(params_for_ai, ensure_ascii=False)[:4000]}\n\n"
-        "CRITICAL RULES:\n"
-        "1. For 'dictionary' type: use ONLY the 'valueId' field from the 'options' list.\n"
-        "   NEVER use the 'label'. Example: if options=[{valueId:'11323_1',label:'Nowy'}]\n"
-        "   then output: {\"id\":\"11323\",\"valuesIds\":[\"11323_1\"]}\n"
-        "2. For 'string' type: {\"id\":\"...\",\"values\":[\"Polish text\"]}\n"
-        "   For Marka/Brand string params: use the exact brand name from PRIORITY section.\n"
-        "3. For 'integer'/'float' type: {\"id\":\"...\",\"values\":[\"42\"]}\n"
-        "4. Fill as many parameters as possible using the product info and detected features.\n"
-        "5. Respond ONLY with a JSON array — no markdown, no explanation.\n\n"
-        "Output format: [{\"id\":\"param_id\",\"valuesIds\":[\"valueId\"]}, ...]"
-    )
-
-    try:
-        ai_resp = anthropic_client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=800,
-            messages=[{"role": "user", "content": prompt}],
+    # ── Claude fills the rest ──
+    ai_results: list[dict] = []
+    if params_for_ai:
+        prompt = (
+            "Fill Allegro listing parameters for a Polish e-commerce product.\n\n"
+            f"Product name: {product_name}\n"
+            f"Short description: {product_description[:400]}\n"
+            f"Detected features: {json.dumps(merged_features, ensure_ascii=False)}\n\n"
+            "Parameters to fill:\n"
+            f"{json.dumps(params_for_ai, ensure_ascii=False)[:4000]}\n\n"
+            "CRITICAL RULES:\n"
+            "1. For 'dictionary' type: use ONLY a 'valueId' from the 'options' list.\n"
+            "   NEVER use the label text. Output: {\"id\":\"param_id\",\"valuesIds\":[\"valueId\"]}\n"
+            "2. For 'string' type: {\"id\":\"param_id\",\"values\":[\"text\"]}\n"
+            "3. For 'integer'/'float' type: {\"id\":\"param_id\",\"values\":[\"42\"]}\n"
+            "4. Only include parameters you can confidently fill from the product info.\n"
+            "5. Respond ONLY with a JSON array — no markdown, no explanation.\n"
         )
-        raw = ai_resp.content[0].text.strip()
-        raw = re.sub(r"^```(?:json)?|```$", "", raw, flags=re.MULTILINE).strip()
-        raw_list = json.loads(raw)
-        if not isinstance(raw_list, list):
-            return []
+        try:
+            ai_resp = anthropic_client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=800,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = ai_resp.content[0].text.strip()
+            raw = re.sub(r"^```(?:json)?|```$", "", raw, flags=re.MULTILINE).strip()
+            raw_list = json.loads(raw)
+            if isinstance(raw_list, list):
+                for item in raw_list:
+                    if not isinstance(item, dict) or not item.get("id"):
+                        continue
+                    param_id = str(item["id"])
+                    if param_id in direct_param_ids:
+                        continue  # already handled directly
+                    clean: dict = {"id": param_id}
+                    if item.get("valuesIds") and isinstance(item["valuesIds"], list):
+                        allowed = valid_value_ids.get(param_id, set())
+                        valid = [str(v) for v in item["valuesIds"]
+                                 if v and (not allowed or str(v) in allowed)]
+                        if not valid:
+                            continue
+                        clean["valuesIds"] = valid
+                    elif item.get("values") and isinstance(item["values"], list):
+                        clean["values"] = [str(v) for v in item["values"] if v is not None]
+                        if not clean["values"]:
+                            continue
+                    else:
+                        continue
+                    ai_results.append(clean)
+        except Exception as e:
+            app.logger.warning("AI parameter fill failed: %s", e)
 
-        result = []
-        for item in raw_list:
-            if not isinstance(item, dict) or not item.get("id"):
-                continue
-            param_id = str(item["id"])
-            clean: dict = {"id": param_id}
-
-            if item.get("valuesIds") and isinstance(item["valuesIds"], list):
-                # Validate each valueId against known allowed IDs — drop invalid ones
-                allowed = valid_value_ids.get(param_id, set())
-                valid = [str(v) for v in item["valuesIds"]
-                         if v and (not allowed or str(v) in allowed)]
-                if not valid:
-                    app.logger.warning("Param %s: all valuesIds invalid %s", param_id, item["valuesIds"])
-                    continue
-                clean["valuesIds"] = valid
-            elif item.get("values") and isinstance(item["values"], list):
-                clean["values"] = [str(v) for v in item["values"] if v is not None]
-                if not clean["values"]:
-                    continue
-            else:
-                continue
-
-            result.append(clean)
-
-        app.logger.info("Allegro AI parameters filled: %d / %d params", len(result), len(params_def))
-        return result
-    except Exception as e:
-        app.logger.warning("AI parameter fill failed: %s", e)
-
-    return []
+    result = direct_results + ai_results
+    app.logger.info("Allegro params: %d direct + %d AI = %d total",
+                    len(direct_results), len(ai_results), len(result))
+    return result
 
 
 def publish_to_allegro(user: User, product_data: dict,
