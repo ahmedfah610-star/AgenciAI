@@ -999,6 +999,13 @@ def health():
     return jsonify({"status": "ok"})
 
 
+# ─── ChatBot Module ───────────────────────────────────────────────────────────
+
+from chatbot import chatbot_bp
+from chatbot.models import (ChatTenant, ChatApiKey, KnowledgeSource,
+                             KnowledgeChunk, Conversation, ChatMessage)
+app.register_blueprint(chatbot_bp)
+
 # ─── Init DB + Run ────────────────────────────────────────────────────────────
 
 with app.app_context():

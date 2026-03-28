@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChatBot — AgenciAI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #f5f5f7; color: #1d1d1f; font-size: 15px; }
+
+    /* Layout */
+    .layout { display: flex; min-height: 100vh; }
+    .sidebar {
+      width: 220px; background: #fff; border-right: 1px solid #e5e5ea;
+      padding: 24px 16px; display: flex; flex-direction: column; gap: 4px;
+      position: sticky; top: 0; height: 100vh;
+    }
+    .sidebar-logo { font-size: 18px; font-weight: 700; padding: 0 8px 20px; }
+    .sidebar-logo span { color: #0071e3; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+      border-radius: 10px; color: #3a3a3c; text-decoration: none; font-size: 14px;
+      cursor: pointer; border: none; background: none; width: 100%; text-align: left;
+    }
+    .nav-item:hover { background: #f5f5f7; }
+    .nav-item.active { background: #e8f0fb; color: #0071e3; font-weight: 600; }
+    .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+
+    .main { flex: 1; padding: 32px; max-width: 900px; }
+    h1 { font-size: 24px; font-weight: 700; margin-bottom: 6px; }
+    .subtitle { color: #6e6e73; font-size: 14px; margin-bottom: 28px; }
+
+    /* Cards */
+    .card { background: #fff; border-radius: 16px; border: 1px solid #e5e5ea; padding: 24px; margin-bottom: 20px; }
+    .card h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+    .tab {
+      padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 500;
+      cursor: pointer; border: 1px solid #e5e5ea; background: #fff; color: #3a3a3c;
+    }
+    .tab.active { background: #0071e3; color: #fff; border-color: #0071e3; }
+
+    /* Form elements */
+    input, textarea, select {
+      width: 100%; border: 1.5px solid #e5e5ea; border-radius: 10px;
+      padding: 10px 14px; font-family: inherit; font-size: 14px; outline: none;
+      transition: border-color 0.15s; background: #fff;
+    }
+    input:focus, textarea:focus, select:focus { border-color: #0071e3; }
+    textarea { resize: vertical; min-height: 100px; }
+    label { display: block; font-size: 13px; font-weight: 500; color: #3a3a3c; margin-bottom: 6px; }
+    .field { margin-bottom: 16px; }
+    .hint { font-size: 12px; color: #8e8e93; margin-top: 4px; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 9px 18px; border-radius: 20px; font-size: 14px; font-weight: 500;
+      cursor: pointer; border: none; transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: #0071e3; color: #fff; }
+    .btn-danger  { background: #ff3b30; color: #fff; }
+    .btn-ghost   { background: #f5f5f7; color: #3a3a3c; border: 1px solid #e5e5ea; }
+
+    /* Source list */
+    .source-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 0; border-bottom: 1px solid #f5f5f7;
+    }
+    .source-item:last-child { border-bottom: none; }
+    .source-status { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .status-ready      { background: #30d158; }
+    .status-processing { background: #0071e3; animation: pulse 1s infinite; }
+    .status-pending    { background: #8e8e93; }
+    .status-failed     { background: #ff3b30; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .source-info { flex: 1; min-width: 0; }
+    .source-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .source-meta { font-size: 12px; color: #8e8e93; margin-top: 2px; }
+
+    /* API key */
+    .key-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0; border-bottom: 1px solid #f5f5f7; font-size: 14px;
+    }
+    .key-row:last-child { border-bottom: none; }
+    .key-prefix { font-family: monospace; color: #3a3a3c; }
+
+    /* Snippet */
+    .snippet {
+      background: #1d1d1f; color: #30d158; border-radius: 12px;
+      padding: 16px; font-family: monospace; font-size: 13px;
+      white-space: pre-wrap; word-break: break-all; position: relative;
+    }
+    .copy-btn {
+      position: absolute; top: 10px; right: 10px;
+      background: #3a3a3c; color: #fff; border: none; border-radius: 8px;
+      padding: 4px 10px; font-size: 12px; cursor: pointer;
+    }
+
+    /* Color preview */
+    .color-row { display: flex; align-items: center; gap: 12px; }
+    .color-swatch { width: 36px; height: 36px; border-radius: 8px; border: 1px solid #e5e5ea; }
+
+    /* Alert */
+    .alert { background: #fff8e6; border: 1px solid #f5a623; border-radius: 10px; padding: 12px 16px; font-size: 13px; margin-bottom: 16px; }
+    .alert strong { color: #b07000; }
+
+    /* Hidden sections */
+    .section { display: none; }
+    .section.active { display: block; }
+  </style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">biz<span>Agent</span></div>
+    <a href="/app" class="nav-item"><span class="icon">🏠</span> Panel główny</a>
+    <button class="nav-item active" onclick="showSection('overview')"><span class="icon">🤖</span> ChatBot</button>
+    <button class="nav-item" onclick="showSection('knowledge')"><span class="icon">📚</span> Baza wiedzy</button>
+    <button class="nav-item" onclick="showSection('conversations')"><span class="icon">💬</span> Rozmowy</button>
+    <button class="nav-item" onclick="showSection('settings')"><span class="icon">⚙️</span> Ustawienia</button>
+    <div style="margin-top:auto">
+      <a href="/auth/logout" class="nav-item" style="color:#ff3b30"><span class="icon">↩</span> Wyloguj</a>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+
+    <!-- OVERVIEW -->
+    <div id="section-overview" class="section active">
+      <h1>Twój ChatBot</h1>
+      <p class="subtitle">Zarządzaj chatbotem i osadź go na stronie klienta.</p>
+
+      <!-- Snippet instalacyjny -->
+      <div class="card">
+        <h2>📋 Kod do osadzenia</h2>
+        <p style="font-size:13px;color:#6e6e73;margin-bottom:12px">
+          Wklej ten kod przed <code>&lt;/body&gt;</code> na stronie klienta.
+          Na WordPressie użyj naszego pluginu.
+        </p>
+        {% if api_keys %}
+        <div class="snippet" id="snippet-box">
+&lt;script
+  src="{{ request.host_url }}chatbot/widget.js"
+  data-key="{{ api_keys[0].key_prefix }}••••••••"
+  data-api-url="{{ request.host_url.rstrip('/') }}"&gt;
+&lt;/script&gt;
+          <button class="copy-btn" onclick="copySnippet()">Kopiuj</button>
+        </div>
+        {% else %}
+        <div class="alert"><strong>Brak klucza API.</strong> Przejdź do sekcji Ustawienia i wygeneruj klucz.</div>
+        {% endif %}
+      </div>
+
+      <!-- Statystyki -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+        <div class="card" style="margin:0;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:#0071e3">{{ conversations|length }}</div>
+          <div style="font-size:13px;color:#6e6e73;margin-top:4px">Rozmowy</div>
+        </div>
+        <div class="card" style="margin:0;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:#30d158">{{ sources|selectattr('status','eq','ready')|list|length }}</div>
+          <div style="font-size:13px;color:#6e6e73;margin-top:4px">Źródła gotowe</div>
+        </div>
+        <div class="card" style="margin:0;text-align:center">
+          <div style="font-size:28px;font-weight:700;color:#ff9f0a">{{ sources|length }}</div>
+          <div style="font-size:13px;color:#6e6e73;margin-top:4px">Wszystkich źródeł</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KNOWLEDGE -->
+    <div id="section-knowledge" class="section">
+      <h1>Baza wiedzy</h1>
+      <p class="subtitle">Dodaj treści — chatbot nauczy się z nich odpowiadać.</p>
+
+      <div class="card">
+        <div class="tabs">
+          <button class="tab active" onclick="switchTab(this,'tab-url')">🌐 URL</button>
+          <button class="tab" onclick="switchTab(this,'tab-file')">📄 Plik (PDF/CSV/TXT)</button>
+          <button class="tab" onclick="switchTab(this,'tab-manual')">✏️ Ręczne Q&A</button>
+        </div>
+
+        <!-- URL -->
+        <div id="tab-url">
+          <div class="field">
+            <label>Adres strony</label>
+            <input type="url" id="url-input" placeholder="https://twoja-strona.pl/o-nas">
+          </div>
+          <div class="field">
+            <label>Nazwa (opcjonalnie)</label>
+            <input type="text" id="url-name" placeholder="Strona O nas">
+          </div>
+          <button class="btn btn-primary" onclick="addUrl()">Dodaj URL</button>
+        </div>
+
+        <!-- Plik -->
+        <div id="tab-file" style="display:none">
+          <label class="btn btn-ghost" style="cursor:pointer;display:inline-flex;padding:40px;width:100%;justify-content:center;border-style:dashed">
+            <span id="file-label">📁 Kliknij aby wybrać plik (PDF, CSV, TXT)</span>
+            <input type="file" id="file-input" accept=".pdf,.txt,.csv" style="display:none" onchange="handleFileSelect(this)">
+          </label>
+          <button class="btn btn-primary" style="margin-top:12px" onclick="uploadFile()">Prześlij plik</button>
+        </div>
+
+        <!-- Manual -->
+        <div id="tab-manual" style="display:none">
+          <div class="field">
+            <label>Pytanie</label>
+            <input type="text" id="manual-q" placeholder="Jakie są godziny otwarcia?">
+          </div>
+          <div class="field">
+            <label>Odpowiedź</label>
+            <textarea id="manual-a" placeholder="Jesteśmy otwarci od poniedziałku do piątku w godzinach 9-17."></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="addManual()">Dodaj Q&A</button>
+        </div>
+      </div>
+
+      <!-- Lista źródeł -->
+      <div class="card">
+        <h2>Źródła <span id="source-count" style="font-weight:400;color:#8e8e93">({{ sources|length }})</span></h2>
+        <div id="sources-list">
+          {% for s in sources %}
+          <div class="source-item" id="source-{{ s.id }}">
+            <div class="source-status status-{{ s.status }}"></div>
+            <div class="source-info">
+              <div class="source-name">{{ s.name }}</div>
+              <div class="source-meta">
+                {{ s.type|upper }}
+                {% if s.chunk_count %} · {{ s.chunk_count }} fragmentów{% endif %}
+                {% if s.error_message %} · <span style="color:#ff3b30">{{ s.error_message }}</span>{% endif %}
+              </div>
+            </div>
+            <button class="btn btn-danger" style="padding:6px 12px;font-size:12px" onclick="deleteSource('{{ s.id }}')">Usuń</button>
+          </div>
+          {% else %}
+          <p style="color:#8e8e93;font-size:14px;padding:12px 0">Brak źródeł. Dodaj URL lub plik powyżej.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- CONVERSATIONS -->
+    <div id="section-conversations" class="section">
+      <h1>Rozmowy</h1>
+      <p class="subtitle">Historia czatów z odwiedzającymi.</p>
+      <div class="card">
+        {% for conv in conversations %}
+        <div style="padding:12px 0;border-bottom:1px solid #f5f5f7;cursor:pointer" onclick="loadMessages('{{ conv.id }}', this)">
+          <div style="font-size:13px;font-weight:500">Gość {{ conv.visitor_id[:12] }}...</div>
+          <div style="font-size:12px;color:#8e8e93;margin-top:2px">{{ conv.created_at.strftime('%d.%m.%Y %H:%M') }} · {{ conv.page_url or 'brak URL' }}</div>
+        </div>
+        {% else %}
+        <p style="color:#8e8e93;font-size:14px">Brak rozmów jeszcze.</p>
+        {% endfor %}
+      </div>
+      <div class="card" id="messages-box" style="display:none">
+        <h2>Wiadomości</h2>
+        <div id="messages-list" style="display:flex;flex-direction:column;gap:10px"></div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="section-settings" class="section">
+      <h1>Ustawienia chatbota</h1>
+      <p class="subtitle">Dostosuj wygląd i zachowanie bota.</p>
+
+      <div class="card">
+        <h2>Wygląd</h2>
+        <div class="field">
+          <label>Nazwa bota</label>
+          <input type="text" id="s-bot-name" value="{{ tenant.bot_name }}">
+        </div>
+        <div class="field">
+          <label>Kolor marki</label>
+          <div class="color-row">
+            <input type="color" id="s-color" value="{{ tenant.primary_color }}" style="width:48px;height:38px;padding:2px;border-radius:8px">
+            <input type="text" id="s-color-text" value="{{ tenant.primary_color }}" style="width:120px">
+          </div>
+        </div>
+        <div class="field">
+          <label>Wiadomość powitalna</label>
+          <input type="text" id="s-welcome" value="{{ tenant.welcome_message }}">
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Zachowanie</h2>
+        <div class="field">
+          <label>Ton komunikacji</label>
+          <select id="s-tone">
+            <option value="professional" {% if tenant.tone=='professional' %}selected{% endif %}>Profesjonalny</option>
+            <option value="friendly"     {% if tenant.tone=='friendly'     %}selected{% endif %}>Przyjazny</option>
+            <option value="casual"       {% if tenant.tone=='casual'       %}selected{% endif %}>Swobodny</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Instrukcja dla bota (system prompt)</label>
+          <textarea id="s-prompt" rows="4">{{ tenant.system_prompt }}</textarea>
+          <div class="hint">Np. "Nigdy nie wspominaj o konkurencji. Zawsze proponuj kontakt telefoniczny przy reklamacjach."</div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" onclick="saveSettings()">Zapisz ustawienia</button>
+
+      <div class="card" style="margin-top:20px">
+        <h2>Klucze API</h2>
+        <div id="keys-list">
+          {% for k in api_keys %}
+          <div class="key-row" id="key-{{ k.id }}">
+            <div>
+              <span class="key-prefix">{{ k.key_prefix }}••••••••</span>
+              <span style="color:#8e8e93;font-size:12px;margin-left:12px">{{ k.label }}</span>
+            </div>
+            <button class="btn btn-danger" style="padding:5px 12px;font-size:12px" onclick="revokeKey('{{ k.id }}')">Unieważnij</button>
+          </div>
+          {% endfor %}
+        </div>
+        <button class="btn btn-ghost" style="margin-top:12px" onclick="createKey()">+ Nowy klucz</button>
+        <div id="new-key-box" style="display:none;margin-top:12px" class="alert">
+          <strong>Zapisz ten klucz — nie będzie pokazany ponownie:</strong><br>
+          <code id="new-key-value" style="font-size:13px;word-break:break-all"></code>
+          <button class="btn btn-ghost" style="margin-top:8px;padding:4px 12px;font-size:12px" onclick="copyKey()">Kopiuj</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── Nawigacja ────────────────────────────────────────────────
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+function switchTab(btn, tabId) {
+  btn.closest('.card').querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  ['tab-url','tab-file','tab-manual'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = (id === tabId) ? '' : 'none';
+  });
+}
+
+// ── Knowledge ────────────────────────────────────────────────
+async function addUrl() {
+  const url  = document.getElementById('url-input').value.trim();
+  const name = document.getElementById('url-name').value.trim();
+  if (!url) return alert('Wpisz adres URL');
+  const res = await fetch('/chatbot/dashboard/knowledge/url', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ url, name }),
+  });
+  const data = await res.json();
+  if (res.ok) {
+    document.getElementById('url-input').value = '';
+    document.getElementById('url-name').value  = '';
+    addSourceToList(data.sourceId, name || url, 'url', 'pending');
+  } else {
+    alert(data.error || 'Błąd');
+  }
+}
+
+function handleFileSelect(input) {
+  const label = document.getElementById('file-label');
+  label.textContent = input.files[0]?.name || '📁 Kliknij aby wybrać plik';
+}
+
+async function uploadFile() {
+  const input = document.getElementById('file-input');
+  if (!input.files[0]) return alert('Wybierz plik');
+  const fd = new FormData();
+  fd.append('file', input.files[0]);
+  const res = await fetch('/chatbot/dashboard/knowledge/upload', { method:'POST', body: fd });
+  const data = await res.json();
+  if (res.ok) {
+    addSourceToList(data.sourceId, input.files[0].name, 'file', 'pending');
+    input.value = '';
+    document.getElementById('file-label').textContent = '📁 Kliknij aby wybrać plik';
+  } else {
+    alert(data.error || 'Błąd uploadu');
+  }
+}
+
+async function addManual() {
+  const q = document.getElementById('manual-q').value.trim();
+  const a = document.getElementById('manual-a').value.trim();
+  if (!q || !a) return alert('Wypełnij oba pola');
+  const res = await fetch('/chatbot/dashboard/knowledge/manual', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ question: q, answer: a }),
+  });
+  const data = await res.json();
+  if (res.ok) {
+    document.getElementById('manual-q').value = '';
+    document.getElementById('manual-a').value = '';
+    addSourceToList(data.sourceId, 'Q&A: ' + q.slice(0, 50), 'manual', 'pending');
+  } else {
+    alert(data.error || 'Błąd');
+  }
+}
+
+async function deleteSource(id) {
+  if (!confirm('Usunąć to źródło?')) return;
+  const res = await fetch('/chatbot/dashboard/knowledge/' + id, { method: 'DELETE' });
+  if (res.ok) document.getElementById('source-' + id)?.remove();
+}
+
+function addSourceToList(id, name, type, status) {
+  const list = document.getElementById('sources-list');
+  const item = document.createElement('div');
+  item.className = 'source-item';
+  item.id = 'source-' + id;
+  item.innerHTML = `
+    <div class="source-status status-${status}"></div>
+    <div class="source-info">
+      <div class="source-name">${name}</div>
+      <div class="source-meta">${type.toUpperCase()} · przetwarzanie...</div>
+    </div>
+    <button class="btn btn-danger" style="padding:6px 12px;font-size:12px" onclick="deleteSource('${id}')">Usuń</button>
+  `;
+  list.prepend(item);
+
+  // Polluj status co 3s
+  const interval = setInterval(async () => {
+    const r = await fetch('/chatbot/dashboard/knowledge/sources');
+    const sources = await r.json();
+    const src = sources.find(s => s.id === id);
+    if (src && src.status !== 'pending' && src.status !== 'processing') {
+      clearInterval(interval);
+      const dot = item.querySelector('.source-status');
+      dot.className = 'source-status status-' + src.status;
+      item.querySelector('.source-meta').textContent =
+        `${src.type?.toUpperCase()} · ${src.chunk_count} fragmentów`;
+    }
+  }, 3000);
+}
+
+// ── Conversations ────────────────────────────────────────────
+async function loadMessages(convId, el) {
+  document.querySelectorAll('[onclick^="loadMessages"]').forEach(e => e.style.background = '');
+  el.style.background = '#f0f7ff';
+
+  const res  = await fetch('/chatbot/dashboard/conversations/' + convId + '/messages');
+  const msgs = await res.json();
+
+  const box  = document.getElementById('messages-box');
+  const list = document.getElementById('messages-list');
+  box.style.display = 'block';
+  list.innerHTML = msgs.map(m => `
+    <div style="display:flex;justify-content:${m.role==='user'?'flex-end':'flex-start'}">
+      <div style="max-width:70%;padding:10px 14px;border-radius:14px;font-size:14px;
+        background:${m.role==='user'?'#0071e3':'#f5f5f7'};
+        color:${m.role==='user'?'#fff':'#1d1d1f'}">
+        ${m.content}
+        ${m.feedback ? `<div style="font-size:11px;margin-top:4px;opacity:0.7">${m.feedback==='thumbs_up'?'👍':'👎'}</div>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Settings ─────────────────────────────────────────────────
+document.getElementById('s-color')?.addEventListener('input', e => {
+  document.getElementById('s-color-text').value = e.target.value;
+});
+
+async function saveSettings() {
+  const res = await fetch('/chatbot/dashboard/settings', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      bot_name:        document.getElementById('s-bot-name').value,
+      primary_color:   document.getElementById('s-color').value,
+      welcome_message: document.getElementById('s-welcome').value,
+      system_prompt:   document.getElementById('s-prompt').value,
+      tone:            document.getElementById('s-tone').value,
+    }),
+  });
+  alert(res.ok ? 'Zapisano!' : 'Błąd zapisu');
+}
+
+async function createKey() {
+  const res  = await fetch('/chatbot/dashboard/api-keys', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ label: 'Widget' }),
+  });
+  const data = await res.json();
+  document.getElementById('new-key-value').textContent = data.key;
+  document.getElementById('new-key-box').style.display = 'block';
+
+  // Dodaj do listy
+  const list = document.getElementById('keys-list');
+  const row  = document.createElement('div');
+  row.className = 'key-row';
+  row.innerHTML = `
+    <div><span class="key-prefix">${data.prefix}••••••••</span>
+    <span style="color:#8e8e93;font-size:12px;margin-left:12px">Widget</span></div>
+    <button class="btn btn-danger" style="padding:5px 12px;font-size:12px">Unieważnij</button>
+  `;
+  list.appendChild(row);
+}
+
+async function revokeKey(id) {
+  if (!confirm('Unieważnić klucz? Widget przestanie działać.')) return;
+  const res = await fetch('/chatbot/dashboard/api-keys/' + id, { method: 'DELETE' });
+  if (res.ok) document.getElementById('key-' + id)?.remove();
+}
+
+function copyKey() {
+  navigator.clipboard.writeText(document.getElementById('new-key-value').textContent);
+  alert('Skopiowano!');
+}
+
+function copySnippet() {
+  const text = document.getElementById('snippet-box').innerText.replace('Kopiuj','').trim();
+  navigator.clipboard.writeText(text);
+  alert('Skopiowano!');
+}
+</script>
+</body>
+</html>
