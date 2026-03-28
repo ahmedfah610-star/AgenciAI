@@ -757,6 +757,13 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
     valid_value_ids: dict[str, set] = {}
 
     for p in params_def:
+        # Skip product-catalog parameters — they cannot be set at offer level
+        # Allegro marks them with offerScope=False (or requiredForProduct=True)
+        if p.get("offerScope") is False:
+            continue
+        if p.get("restrictions", {}).get("offerScope") is False:
+            continue
+
         entry: dict = {"id": p["id"], "name": p["name"], "type": p["type"],
                        "required": p.get("required", False)}
         if p.get("dictionaryValues"):
@@ -933,14 +940,40 @@ def publish_to_allegro(user: User, product_data: dict,
         offer["images"] = allegro_image_urls
         app.logger.info("Allegro offer images: %s", allegro_image_urls)
 
-    app.logger.info("Allegro offer payload: %s", json.dumps(offer, ensure_ascii=False)[:2000])
-    resp = requests.post(
-        f"{ALLEGRO_API_BASE}/sale/product-offers",
-        headers=_allegro_bearer_headers(access_token),
-        json=offer,
-        timeout=20,
-    )
-    app.logger.info("Allegro POST /sale/product-offers → %s: %s", resp.status_code, resp.text[:1000])
+    def _post_offer(o: dict):
+        app.logger.info("Allegro offer payload: %s", json.dumps(o, ensure_ascii=False)[:2000])
+        r = requests.post(
+            f"{ALLEGRO_API_BASE}/sale/product-offers",
+            headers=_allegro_bearer_headers(access_token),
+            json=o, timeout=20,
+        )
+        app.logger.info("Allegro POST → %s: %s", r.status_code, r.text[:1000])
+        return r
+
+    resp = _post_offer(offer)
+
+    # Auto-retry: if Allegro rejects specific parameters (product-catalog scope),
+    # strip them out and try once more
+    if resp.status_code == 422 and offer.get("parameters"):
+        try:
+            errs = resp.json().get("errors", [])
+            bad_ids = set()
+            for e in errs:
+                if e.get("code") in ("ParameterCategoryException", "DictionaryParameterIdNotFound",
+                                     "ParameterValueNotAllowedException"):
+                    # Extract param id from userMessage e.g. "Parameter `15851:Płeć`..."
+                    m = re.search(r"`(\d+):", e.get("userMessage", "") or e.get("message", ""))
+                    if m:
+                        bad_ids.add(m.group(1))
+            if bad_ids:
+                app.logger.warning("Retrying without rejected params: %s", bad_ids)
+                offer["parameters"] = [p for p in offer["parameters"]
+                                       if str(p.get("id")) not in bad_ids]
+                if not offer["parameters"]:
+                    del offer["parameters"]
+                resp = _post_offer(offer)
+        except Exception as retry_err:
+            app.logger.warning("Retry logic failed: %s", retry_err)
 
     if resp.ok:
         data      = resp.json()
