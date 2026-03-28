@@ -1140,71 +1140,88 @@ def publish_to_allegro(user: User, product_data: dict,
 
     resp = _post_offer(offer)
 
-    # Retry logic — strip individual bad parameters, then taxSettings, then all params
-    for _attempt in range(4):
+    # Retry logic — strip individual bad parameters one at a time, up to 8 attempts
+    for _attempt in range(8):
         if resp.status_code != 422:
             break
         try:
-            errs = resp.json().get("errors", [])
+            body = resp.json()
+            errs = body.get("errors", [])
             if not errs:
                 break
 
+            app.logger.warning("422 attempt %d errors: %s", _attempt, json.dumps(errs)[:600])
             fixed = False
 
-            # 1. Remove specific bad parameter IDs reported in errors
-            bad_param_ids = set()
+            # ── Extract bad param IDs from every error field ──
+            bad_param_ids: set[str] = set()
             for e in errs:
+                # From path like "parameters[2]"
                 path = e.get("path") or ""
-                # path like "parameters[2]" or "parameters[2].valuesIds[0]"
                 m = re.match(r"parameters\[(\d+)\]", path)
                 if m and offer.get("parameters"):
                     idx = int(m.group(1))
                     params = offer["parameters"]
                     if idx < len(params):
-                        bad_id = params[idx].get("id")
-                        if bad_id:
-                            bad_param_ids.add(bad_id)
-                # Also catch ParameterCategoryException / similar by code
-                code = (e.get("code") or "").lower()
-                msg  = (e.get("userMessage") or e.get("message") or "")
-                # extract param id from userMessage like "Parameter `54:Rozmiar`..."
-                pm = re.search(r"Parameter `(\d+):", msg)
-                if pm:
-                    bad_param_ids.add(pm.group(1))
+                        bad_param_ids.add(str(params[idx].get("id", "")))
+
+                # From userMessage / message — match any digits before colon
+                # e.g. "Parameter `1294:Rodzaj` should not..." or "Parameter 54:Rozmiar..."
+                for field in ("userMessage", "message", "details"):
+                    text = e.get(field) or ""
+                    for match in re.finditer(r"\b(\d{2,})\s*:", text):
+                        bad_param_ids.add(match.group(1))
+
+                # From ParameterCategoryException code — mark any param in path
+                code = (e.get("code") or "")
+                if "ParameterCategory" in code and path.startswith("parameters"):
+                    # path = "parameters" → drop all
+                    bad_param_ids.update(
+                        str(p.get("id", "")) for p in (offer.get("parameters") or [])
+                        if p.get("id")
+                    )
+
+            bad_param_ids.discard("")
 
             if bad_param_ids and offer.get("parameters"):
                 before = len(offer["parameters"])
-                offer["parameters"] = [p for p in offer["parameters"]
-                                        if p.get("id") not in bad_param_ids]
-                app.logger.warning("Removed bad params %s (%d→%d), retrying",
-                                   bad_param_ids, before, len(offer["parameters"]))
+                offer["parameters"] = [
+                    p for p in offer["parameters"]
+                    if str(p.get("id", "")) not in bad_param_ids
+                ]
+                after = len(offer["parameters"])
+                app.logger.warning("Attempt %d: removed params %s (%d→%d)",
+                                   _attempt, bad_param_ids, before, after)
+                if after == before:
+                    # Nothing removed — avoid infinite loop, drop all
+                    offer.pop("parameters", None)
                 fixed = True
 
-            # 2. Generic parameter error — drop all remaining params
-            elif offer.get("parameters") and any(
-                "parameter" in (e.get("code") or "").lower() or
-                (e.get("path") or "").startswith("parameters")
-                for e in errs
-            ):
-                app.logger.warning("Generic parameter error — dropping all params and retrying")
-                offer.pop("parameters", None)
-                fixed = True
-
-            # 3. Tax error — drop taxSettings
+            # Tax error
             elif offer.get("taxSettings") and any(
                 "tax" in (e.get("code") or "").lower() or
                 (e.get("path") or "").startswith("taxSettings")
                 for e in errs
             ):
-                app.logger.warning("Tax error — dropping taxSettings and retrying")
+                app.logger.warning("Attempt %d: tax error — dropping taxSettings", _attempt)
                 offer.pop("taxSettings", None)
+                fixed = True
+
+            # Any other parameter error — drop all
+            elif offer.get("parameters") and any(
+                "parameter" in (e.get("code") or "").lower() or
+                (e.get("path") or "").startswith("parameters")
+                for e in errs
+            ):
+                app.logger.warning("Attempt %d: dropping all parameters", _attempt)
+                offer.pop("parameters", None)
                 fixed = True
 
             if not fixed:
                 break
             resp = _post_offer(offer)
         except Exception as retry_err:
-            app.logger.warning("Retry attempt failed: %s", retry_err)
+            app.logger.warning("Retry attempt %d failed: %s", _attempt, retry_err)
             break
 
     if resp.ok:
