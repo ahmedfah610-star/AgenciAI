@@ -188,7 +188,7 @@
       <div id="cs-messages" role="log" aria-live="polite"></div>
       <div id="cs-footer">
         <div id="cs-input-row">
-          <textarea id="cs-input" rows="1" placeholder="Type a message…" aria-label="Message"></textarea>
+          <textarea id="cs-input" rows="1" placeholder="Napisz wiadomość…" aria-label="Wiadomość"></textarea>
           <button id="cs-send" aria-label="Send">${sendIcon()}</button>
         </div>
         <div id="cs-powered">Powered by <a href="https://chatsaas.io" target="_blank" rel="noopener">ChatSaaS</a></div>
@@ -466,7 +466,7 @@
   }
   function sendIcon() {
     return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+      <path d="M5 12h14M13 6l6 6-6 6" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
     </svg>`;
   }
 
