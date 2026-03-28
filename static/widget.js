@@ -318,13 +318,12 @@
 
       hideTypingIndicator();
 
-      // Create empty bot bubble for streaming
-      const botDiv = createStreamBubble();
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
       let fullText = '';
       let finalMsgId = null;
+      let botDiv = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -332,29 +331,26 @@
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
-        buffer = lines.pop(); // keep incomplete line
+        buffer = lines.pop();
 
         for (const line of lines) {
           if (!line.startsWith('data:')) continue;
           try {
             const payload = JSON.parse(line.slice(5).trim());
 
-            if (payload.event === 'meta' || line.includes('"conversationId"')) {
-              const data = JSON.parse(line.slice(5).trim());
-              if (data.conversationId) conversationId = data.conversationId;
-            }
+            if (payload.conversationId) conversationId = payload.conversationId;
             if (payload.error) {
+              if (!botDiv) botDiv = createStreamBubble();
               botDiv.innerHTML = esc(payload.error);
               scrollToBottom();
             }
             if (payload.text) {
+              if (!botDiv) botDiv = createStreamBubble();
               fullText += payload.text;
               botDiv.innerHTML = linkify(esc(fullText)) + '<span class="cs-cursor">▍</span>';
               scrollToBottom();
             }
-            if (payload.messageId) {
-              finalMsgId = payload.messageId;
-            }
+            if (payload.messageId) finalMsgId = payload.messageId;
           } catch {}
         }
       }
