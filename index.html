@@ -521,6 +521,111 @@
   .btn-both:hover { filter: brightness(1.1); transform: translateY(-1px); }
   .btn-both:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
 
+  /* ─── Allegro Advanced Options ─── */
+  .allegro-advanced-section {
+    display: none;
+    margin-top: 20px;
+    border: 1.5px solid rgba(255,90,0,0.2);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .allegro-advanced-section.visible { display: block; }
+  .allegro-adv-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: rgba(255,90,0,0.05);
+    cursor: pointer;
+    user-select: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: #cc4400;
+    border-bottom: 1.5px solid rgba(255,90,0,0.15);
+  }
+  .allegro-adv-header:hover { background: rgba(255,90,0,0.08); }
+  .allegro-adv-chevron { font-size: 11px; transition: transform 0.2s; }
+  .allegro-adv-body {
+    display: none;
+    padding: 16px;
+    flex-direction: column;
+    gap: 14px;
+    background: var(--surface);
+  }
+  .allegro-adv-body.open { display: flex; }
+  .adv-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .radio-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    border: 1.5px solid var(--border2);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.15s;
+    color: var(--text);
+  }
+  .radio-option:hover { border-color: #ff5a00; background: rgba(255,90,0,0.04); }
+  .radio-option input[type=radio] { accent-color: #ff5a00; margin-top: 1px; }
+  .radio-option.selected { border-color: #ff5a00; background: rgba(255,90,0,0.06); }
+  .radio-option .ro-title { font-weight: 600; display: block; }
+  .radio-option .ro-desc { font-size: 11px; color: var(--muted); display: block; }
+  .vat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .vat-country {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .vat-country label { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .vat-country select {
+    padding: 7px 10px;
+    border-radius: 7px;
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    font-size: 13px;
+    color: var(--text);
+    font-family: inherit;
+  }
+  .ads-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .ads-toggle {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 13px;
+    border-radius: 8px;
+    border: 1.5px solid var(--border2);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    background: var(--surface);
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .ads-toggle input { display: none; }
+  .ads-toggle.active { border-color: #ff5a00; color: var(--text); background: rgba(255,90,0,0.06); }
+
   @media (max-width: 768px) {
     main { grid-template-columns: 1fr; }
     .panel { border-right: none; border-bottom: 1px solid var(--border); }
@@ -752,6 +857,108 @@
           </div>
         </div>
 
+        <!-- Allegro Advanced Options -->
+        <div class="allegro-advanced-section" id="allegro-advanced">
+          <div class="allegro-adv-header" id="allegro-adv-toggle" onclick="toggleAllegroAdv()">
+            <span>⚙ Opcje zaawansowane Allegro</span>
+            <span class="allegro-adv-chevron" id="allegro-adv-chevron">▼</span>
+          </div>
+          <div class="allegro-adv-body" id="allegro-adv-body">
+
+            <!-- Fulfillment -->
+            <div>
+              <div class="adv-label">Realizacja wysyłki</div>
+              <div class="radio-group">
+                <label class="radio-option selected" id="ro-self" onclick="selectFulfillment('SELF')">
+                  <input type="radio" name="al-fulfillment" value="SELF" checked>
+                  <span><span class="ro-title">Sam obsługuję wysyłkę</span><span class="ro-desc">Samodzielnie pakujesz i nadajesz przesyłki</span></span>
+                </label>
+                <label class="radio-option" id="ro-one" onclick="selectFulfillment('ONE_FULFILLMENT')">
+                  <input type="radio" name="al-fulfillment" value="ONE_FULFILLMENT">
+                  <span><span class="ro-title">🏭 One Fulfillment by Allegro</span><span class="ro-desc">Allegro pakuje i wysyła za Ciebie z magazynu</span></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Handling time -->
+            <div>
+              <div class="adv-label">Czas wysyłki (od zamówienia)</div>
+              <select id="al-handling-time" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);font-size:13px;color:var(--text);font-family:inherit;">
+                <option value="PT0S">Tego samego dnia</option>
+                <option value="PT24H" selected>1 dzień roboczy</option>
+                <option value="PT48H">2 dni robocze</option>
+                <option value="P3D">3 dni robocze</option>
+                <option value="P5D">5 dni roboczych</option>
+                <option value="P7D">7 dni</option>
+                <option value="P14D">14 dni</option>
+              </select>
+            </div>
+
+            <!-- VAT rates -->
+            <div>
+              <div class="adv-label">Stawka VAT (kraj sprzedaży)</div>
+              <div class="vat-grid">
+                <div class="vat-country">
+                  <label>🇵🇱 Polska</label>
+                  <select id="al-vat-pl">
+                    <option value="23" selected>23%</option>
+                    <option value="8">8%</option>
+                    <option value="5">5%</option>
+                    <option value="0">0%</option>
+                    <option value="EXEMPT">Zwolniony</option>
+                  </select>
+                </div>
+                <div class="vat-country">
+                  <label>🇸🇰 Słowacja</label>
+                  <select id="al-vat-sk">
+                    <option value="20" selected>20%</option>
+                    <option value="10">10%</option>
+                    <option value="0">0%</option>
+                    <option value="EXEMPT">Zwolniony</option>
+                  </select>
+                </div>
+                <div class="vat-country">
+                  <label>🇭🇺 Węgry</label>
+                  <select id="al-vat-hu">
+                    <option value="27" selected>27%</option>
+                    <option value="18">18%</option>
+                    <option value="5">5%</option>
+                    <option value="0">0%</option>
+                    <option value="EXEMPT">Zwolniony</option>
+                  </select>
+                </div>
+                <div class="vat-country">
+                  <label>🇨🇿 Czechy</label>
+                  <select id="al-vat-cz">
+                    <option value="21" selected>21%</option>
+                    <option value="15">15%</option>
+                    <option value="10">10%</option>
+                    <option value="0">0%</option>
+                    <option value="EXEMPT">Zwolniony</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Allegro Ads -->
+            <div>
+              <div class="adv-label">Reklama Allegro Ads (opcjonalnie)</div>
+              <div class="ads-group">
+                <label class="ads-toggle" id="ads-pl-toggle" onclick="toggleAds('pl')">
+                  <input type="checkbox" id="al-ads-pl">
+                  🇵🇱 Polska
+                </label>
+                <label class="ads-toggle" id="ads-cz-toggle" onclick="toggleAds('cz')">
+                  <input type="checkbox" id="al-ads-cz">
+                  🇨🇿 Czechy
+                </label>
+              </div>
+              <div style="font-size:11px;color:var(--muted);margin-top:6px;">Wyróżnienie ogłoszenia w wynikach wyszukiwania</div>
+            </div>
+
+          </div>
+        </div>
+
         <div class="publish-buttons">
           <button class="btn btn-both" id="publish-btn">
             🚀 Wyślij na wybrane platformy
@@ -775,6 +982,33 @@ let tags = [];
 let allegroAuthorized = false;
 let allegroStatusFetched = false;
 let currentFeatures = {};
+
+// ─── Allegro Advanced ─────────────────────────────────────────────────────────
+function toggleAllegroAdv() {
+  const body    = document.getElementById('allegro-adv-body');
+  const chevron = document.getElementById('allegro-adv-chevron');
+  const isOpen  = body.classList.toggle('open');
+  chevron.style.transform = isOpen ? 'rotate(180deg)' : '';
+}
+
+function selectFulfillment(val) {
+  document.querySelectorAll('.radio-option').forEach(el => el.classList.remove('selected'));
+  document.getElementById(val === 'SELF' ? 'ro-self' : 'ro-one').classList.add('selected');
+  document.querySelector(`input[name=al-fulfillment][value="${val}"]`).checked = true;
+}
+
+function toggleAds(country) {
+  const cb     = document.getElementById(`al-ads-${country}`);
+  const toggle = document.getElementById(`ads-${country}-toggle`);
+  cb.checked = !cb.checked;
+  toggle.classList.toggle('active', cb.checked);
+}
+
+function showAllegroAdvanced() {
+  const alChecked = document.getElementById('target-allegro').checked;
+  const section   = document.getElementById('allegro-advanced');
+  section.classList.toggle('visible', alChecked);
+}
 
 // ─── Auth check on load ───────────────────────────────────────────────────────
 async function initAuth() {
@@ -1003,6 +1237,7 @@ function populateForm(product) {
   renderTags();
 
   document.getElementById('publish-result').classList.remove('visible');
+  showAllegroAdvanced();
 }
 
 function hideProduct() {
@@ -1079,6 +1314,7 @@ document.getElementById('toggle-allegro').addEventListener('click', () => {
   const cb = document.getElementById('target-allegro');
   cb.checked = !cb.checked;
   document.getElementById('toggle-allegro').classList.toggle('active', cb.checked);
+  showAllegroAdvanced();
 });
 
 // ─── Allegro Auth ─────────────────────────────────────────────────────────────
@@ -1216,6 +1452,22 @@ document.getElementById('publish-btn').addEventListener('click', async () => {
   formData.append('features', JSON.stringify(currentFeatures));
   const topicVal = document.getElementById('topic-input').value.trim();
   if (topicVal) formData.append('topic', topicVal);
+  // Allegro advanced options
+  const allegroOpts = {
+    fulfillment:   document.querySelector('input[name=al-fulfillment]:checked')?.value || 'SELF',
+    handlingTime:  document.getElementById('al-handling-time').value,
+    vat: {
+      pl: document.getElementById('al-vat-pl').value,
+      sk: document.getElementById('al-vat-sk').value,
+      hu: document.getElementById('al-vat-hu').value,
+      cz: document.getElementById('al-vat-cz').value,
+    },
+    ads: {
+      pl: document.getElementById('al-ads-pl').checked,
+      cz: document.getElementById('al-ads-cz').checked,
+    },
+  };
+  formData.append('allegro_options', JSON.stringify(allegroOpts));
   currentFiles.forEach(f => formData.append('images', f));
 
   publishBtn.disabled = true;

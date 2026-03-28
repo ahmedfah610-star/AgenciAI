@@ -805,7 +805,8 @@ def publish_to_allegro(user: User, product_data: dict,
                        image_urls: list[str] | None = None,
                        image_bytes_list: list[tuple[bytes, str]] | None = None,
                        features: dict | None = None,
-                       topic: str = "") -> dict:
+                       topic: str = "",
+                       allegro_options: dict | None = None) -> dict:
     s            = _ensure_settings(user)
     access_token = _get_valid_access_token(user)
     if not access_token:
@@ -844,6 +845,8 @@ def publish_to_allegro(user: User, product_data: dict,
     # Fill parameters from detected features
     parameters = _fill_allegro_parameters(access_token, category_id, merged_features)
 
+    opts = allegro_options or {}
+
     offer: dict = {
         "name":       product_data["name"][:75],
         "category":   {"id": category_id},
@@ -863,11 +866,26 @@ def publish_to_allegro(user: User, product_data: dict,
             "city":        s.allegro_city,
             "postCode":    s.allegro_postcode,
         },
-        "delivery":    {"handlingTime": "PT24H"},
+        "delivery":    {"handlingTime": opts.get("handlingTime", "PT24H")},
         "publication": {"status": "INACTIVE"},
     }
     if shipping_rate_id:
         offer["delivery"]["shippingRates"] = {"id": shipping_rate_id}
+
+    # Fulfillment (One Fulfillment by Allegro)
+    if opts.get("fulfillment") == "ONE_FULFILLMENT":
+        offer["fulfillment"] = {"availabilityCode": "ONE_FULFILLMENT"}
+
+    # VAT — use Poland rate as primary tax setting
+    vat    = opts.get("vat", {})
+    pl_vat = vat.get("pl", "23")
+    if pl_vat and pl_vat != "EXEMPT":
+        offer["tax"] = {"percentage": str(pl_vat), "subject": "INCLUDED"}
+
+    # Allegro Ads promotion
+    ads = opts.get("ads", {})
+    if ads.get("pl") or ads.get("cz"):
+        offer["promotion"] = {"emphasize": True, "bold": False}
 
     image_upload_errors = []
     allegro_image_urls, image_upload_errors = _upload_images_to_allegro(
@@ -996,6 +1014,11 @@ def publish():
     except Exception:
         features = {}
     topic = (request.form.get("topic") or "").strip()
+    allegro_opts_raw = request.form.get("allegro_options", "{}")
+    try:
+        allegro_opts = json.loads(allegro_opts_raw)
+    except Exception:
+        allegro_opts = {}
 
     # Read all image files into memory first (so we can use them for both WP and Allegro)
     raw_images: list[tuple[bytes, str, str]] = []  # (bytes, mime, filename_stem)
@@ -1051,6 +1074,7 @@ def publish():
             image_bytes_list=image_bytes_list,
             features=features,
             topic=topic,
+            allegro_options=allegro_opts,
         )
 
     wc_ok = result["woocommerce"] and result["woocommerce"].get("success")
