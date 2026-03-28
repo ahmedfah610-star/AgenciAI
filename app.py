@@ -750,10 +750,41 @@ def _get_allegro_shipping_rate_id(access_token: str) -> str | None:
     return None
 
 
+def _ensure_leaf_category(access_token: str, category_id: str) -> str:
+    """
+    Given a category ID, return it if it's a leaf.
+    If not a leaf, find the first leaf child (BFS one level deep).
+    """
+    headers = _allegro_bearer_headers(access_token)
+    resp = requests.get(f"{ALLEGRO_API_BASE}/sale/categories/{category_id}",
+                        headers=headers, timeout=10)
+    if resp.ok:
+        cat = resp.json()
+        if cat.get("leaf"):
+            return category_id
+        # Not a leaf — fetch children and pick first leaf
+        children_resp = requests.get(f"{ALLEGRO_API_BASE}/sale/categories",
+                                     headers=headers,
+                                     params={"parent.id": category_id}, timeout=10)
+        if children_resp.ok:
+            children = children_resp.json().get("categories", [])
+            for child in children:
+                if child.get("leaf"):
+                    app.logger.info("Category %s not leaf → using child %s", category_id, child["id"])
+                    return str(child["id"])
+            # No leaf child found at first level — recurse into first child
+            if children:
+                return _ensure_leaf_category(access_token, str(children[0]["id"]))
+    return category_id  # return as-is if we can't verify
+
+
 def _find_allegro_category(access_token: str, category_name: str,
                            product_name: str = "") -> str | None:
     """Find best Allegro leaf category. Uses matching-categories first (most accurate)."""
     headers = _allegro_bearer_headers(access_token)
+
+    def _to_leaf(cat_id: str) -> str:
+        return _ensure_leaf_category(access_token, cat_id)
 
     # 1. matching-categories by product name — most semantic, Allegro recommends this
     if product_name:
@@ -762,20 +793,23 @@ def _find_allegro_category(access_token: str, category_name: str,
         if resp.ok:
             cats = resp.json().get("matchingCategories", [])
             if cats:
-                app.logger.info("Allegro matching-categories found: %s", cats[0]["id"])
-                return str(cats[0]["id"])
+                cat_id = str(cats[0]["id"])
+                leaf_id = _to_leaf(cat_id)
+                app.logger.info("matching-categories: %s → leaf: %s", cat_id, leaf_id)
+                return leaf_id
 
     def _search_by_name(name: str) -> str | None:
         resp = requests.get(f"{ALLEGRO_API_BASE}/sale/categories",
                             headers=headers, params={"name": name}, timeout=10)
         if resp.ok:
             cats = resp.json().get("categories", [])
-            # prefer leaf categories
+            # prefer already-leaf categories
             for cat in cats:
                 if cat.get("leaf"):
                     return str(cat["id"])
+            # fallback: take first and ensure leaf
             if cats:
-                return str(cats[0]["id"])
+                return _to_leaf(str(cats[0]["id"]))
         return None
 
     # 2. AI-suggested category name
@@ -788,13 +822,13 @@ def _find_allegro_category(access_token: str, category_name: str,
     if cat_id:
         return cat_id
 
-    # 4. Last resort: first root category
+    # 4. Last resort: first root category → leaf
     resp = requests.get(f"{ALLEGRO_API_BASE}/sale/categories",
                         headers=headers, timeout=10)
     if resp.ok:
         cats = resp.json().get("categories", [])
         if cats:
-            return str(cats[0]["id"])
+            return _to_leaf(str(cats[0]["id"]))
 
     return None
 
