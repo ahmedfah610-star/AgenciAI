@@ -872,20 +872,16 @@ def publish_to_allegro(user: User, product_data: dict,
     if shipping_rate_id:
         offer["delivery"]["shippingRates"] = {"id": shipping_rate_id}
 
-    # Fulfillment (One Fulfillment by Allegro)
-    if opts.get("fulfillment") == "ONE_FULFILLMENT":
-        offer["fulfillment"] = {"availabilityCode": "ONE_FULFILLMENT"}
+    # VAT invoice type — derived from user's Poland VAT selection
+    vat     = opts.get("vat", {})
+    pl_vat  = vat.get("pl", "23")
+    invoice = "WITHOUT_VAT" if pl_vat == "EXEMPT" else "VAT"
+    offer["payments"] = {"invoice": invoice}
 
-    # VAT — use Poland rate as primary tax setting
-    vat    = opts.get("vat", {})
-    pl_vat = vat.get("pl", "23")
-    if pl_vat and pl_vat != "EXEMPT":
-        offer["tax"] = {"percentage": str(pl_vat), "subject": "INCLUDED"}
-
-    # Allegro Ads promotion
+    # Allegro Ads — correct field: promotion.highlighted (not emphasize)
     ads = opts.get("ads", {})
     if ads.get("pl") or ads.get("cz"):
-        offer["promotion"] = {"emphasize": True, "bold": False}
+        offer["promotion"] = {"highlighted": True, "bold": False, "departmentPage": False}
 
     image_upload_errors = []
     allegro_image_urls, image_upload_errors = _upload_images_to_allegro(
@@ -1081,6 +1077,105 @@ def publish():
     al_ok = result["allegro"]     and result["allegro"].get("success")
     result["success"] = bool(wc_ok or al_ok)
     return jsonify(result)
+
+
+# ─── ALLEGRO SUGGEST OPTIONS ──────────────────────────────────────────────────
+
+# VAT parameter names used by Allegro in category parameters
+_ALLEGRO_VAT_PARAM_NAMES = {"Stawka VAT", "VAT rate", "Podatek VAT", "VAT"}
+
+# Country default VAT rates (when Allegro doesn't specify)
+_COUNTRY_DEFAULT_VAT = {"pl": "23", "sk": "20", "hu": "27", "cz": "21"}
+
+
+def _parse_vat_value(raw: str) -> str | None:
+    """Convert Allegro dict value like '23%' or '0.23' to plain integer string '23'."""
+    raw = raw.strip().replace(",", ".")
+    if raw.endswith("%"):
+        try:
+            return str(int(float(raw[:-1])))
+        except ValueError:
+            return None
+    try:
+        val = float(raw)
+        # If it looks like a fraction (0.23) convert to percent
+        if 0 < val <= 1:
+            return str(int(round(val * 100)))
+        if val > 1:
+            return str(int(val))
+    except ValueError:
+        pass
+    return None
+
+
+@app.route("/api/allegro/suggest-vat", methods=["POST"])
+@login_required
+def allegro_suggest_vat():
+    """Return suggested VAT rates for a product's Allegro category."""
+    access_token = _get_valid_access_token(current_user)
+    if not access_token:
+        return jsonify({"error": "not_authorized"}), 401
+
+    data         = request.get_json() or {}
+    product_name = (data.get("product_name") or "").strip()
+    category_name = (data.get("category") or "").strip()
+
+    category_id = _find_allegro_category(access_token, category_name, product_name)
+    if not category_id:
+        return jsonify({"vat": _COUNTRY_DEFAULT_VAT, "category_id": None})
+
+    # Fetch category parameters — look for a VAT parameter
+    headers = _allegro_bearer_headers(access_token)
+    resp = requests.get(
+        f"{ALLEGRO_API_BASE}/sale/categories/{category_id}/parameters",
+        headers=headers, timeout=10,
+    )
+
+    suggested_rate = None
+    if resp.ok:
+        for param in resp.json().get("parameters", []):
+            if param.get("name") in _ALLEGRO_VAT_PARAM_NAMES:
+                values = param.get("dictionaryValues", [])
+                if values:
+                    suggested_rate = _parse_vat_value(values[0].get("value", ""))
+                    break
+
+    if not suggested_rate:
+        # Fallback: fetch seller tax-settings and find first rate
+        ts_resp = requests.get(
+            f"{ALLEGRO_API_BASE}/sale/tax-settings",
+            headers=headers, timeout=10,
+        )
+        if ts_resp.ok:
+            settings = ts_resp.json().get("taxSettings", [])
+            for ts in settings:
+                rate_str = ts.get("rate") or ts.get("percentage") or ts.get("name", "")
+                parsed = _parse_vat_value(str(rate_str))
+                if parsed and parsed != "0":
+                    suggested_rate = parsed
+                    break
+
+    if not suggested_rate:
+        suggested_rate = "23"   # universal fallback
+
+    # Build per-country response using same suggested rate as base,
+    # adjusted to nearest valid rate for each country
+    def _nearest(rate: str, options: list[str]) -> str:
+        try:
+            r = int(rate)
+            return min(options, key=lambda x: abs(int(x) - r))
+        except (ValueError, TypeError):
+            return options[0]
+
+    vat = {
+        "pl": _nearest(suggested_rate, ["23", "8", "5", "0"]),
+        "sk": _nearest(suggested_rate, ["20", "10", "0"]),
+        "hu": _nearest(suggested_rate, ["27", "18", "5", "0"]),
+        "cz": _nearest(suggested_rate, ["21", "15", "10", "0"]),
+    }
+
+    return jsonify({"vat": vat, "category_id": category_id,
+                    "suggested_rate": suggested_rate})
 
 
 # ─── ALLEGRO AUTH ROUTES ───────────────────────────────────────────────────────

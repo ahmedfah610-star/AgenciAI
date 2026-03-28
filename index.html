@@ -1010,6 +1010,30 @@ function showAllegroAdvanced() {
   section.classList.toggle('visible', alChecked);
 }
 
+async function fetchAllegroSuggestVat(productName, category) {
+  try {
+    const resp = await fetch('/api/allegro/suggest-vat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ product_name: productName, category }),
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (!data.vat) return;
+    const map = { pl: 'al-vat-pl', sk: 'al-vat-sk', hu: 'al-vat-hu', cz: 'al-vat-cz' };
+    for (const [country, elId] of Object.entries(map)) {
+      const sel = document.getElementById(elId);
+      const rate = data.vat[country];
+      if (sel && rate) {
+        // find matching option, or closest
+        const opt = [...sel.options].find(o => o.value === rate);
+        if (opt) sel.value = rate;
+      }
+    }
+  } catch (_) {}
+}
+
 // ─── Auth check on load ───────────────────────────────────────────────────────
 async function initAuth() {
   try {
@@ -1209,6 +1233,11 @@ analyzeBtn.addEventListener('click', async () => {
     document.getElementById('empty-state').style.display = 'none';
     document.getElementById('product-form').classList.add('visible');
     setStatus('success', '✓ Produkt wygenerowany — sprawdź i opublikuj poniżej');
+
+    // Auto-suggest VAT rates from Allegro category (non-blocking)
+    if (document.getElementById('target-allegro').checked) {
+      fetchAllegroSuggestVat(data.product.name, data.product.category);
+    }
 
   } catch (err) {
     setStatus('error', '✗ ' + err.message);
