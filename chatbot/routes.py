@@ -138,13 +138,21 @@ def send_message():
     db.session.add(user_msg)
     db.session.commit()
 
+    # Wyciągnij dane tenanta PRZED generatorem — sesja SQLAlchemy nie żyje wewnątrz generatora
+    tenant_data = {
+        'id':             tenant.id,
+        'bot_name':       tenant.bot_name,
+        'system_prompt':  tenant.system_prompt,
+        'tone':           tenant.tone,
+    }
+
     def generate():
         full_response = ''
         sources = []
         start = datetime.utcnow()
         yield f'data: {json.dumps({"conversationId": conv_id})}\n\n'
         try:
-            stream, sources = rag_query(tenant, message, conv_id)
+            stream, sources = rag_query(tenant_data, message, conv_id)
             with stream as s:
                 for text in s.text_stream:
                     full_response += text
@@ -154,11 +162,13 @@ def send_message():
             return
 
         latency = int((datetime.utcnow() - start).total_seconds() * 1000)
-        asst = m.ChatMessage(conversation_id=conv_id, tenant_id=tenant.id,
-                             role='assistant', content=full_response, latency_ms=latency)
-        db.session.add(asst)
-        db.session.commit()
-        yield f'event: done\ndata: {json.dumps({"messageId": asst.id, "sources": sources})}\n\n'
+        _db = get_db()
+        _m = get_models()
+        asst = _m.ChatMessage(conversation_id=conv_id, tenant_id=tenant_data['id'],
+                              role='assistant', content=full_response, latency_ms=latency)
+        _db.session.add(asst)
+        _db.session.commit()
+        yield f'data: {json.dumps({"messageId": asst.id, "sources": sources})}\n\n'
 
     return Response(stream_with_context(generate()), mimetype='text/event-stream',
                     headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no',

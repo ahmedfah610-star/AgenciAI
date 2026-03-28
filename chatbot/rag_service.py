@@ -25,7 +25,7 @@ def rag_query(tenant, user_message: str, conversation_id: str):
     query_vec = embed(user_message)
 
     # 2. Pobierz wszystkie chunki tego tenanta i policz similarity
-    chunks = KnowledgeChunk.query.filter_by(tenant_id=tenant.id).all()
+    chunks = KnowledgeChunk.query.filter_by(tenant_id=tenant['id']).all()
     scored = []
     for chunk in chunks:
         if not chunk.embedding:
@@ -56,7 +56,7 @@ def rag_query(tenant, user_message: str, conversation_id: str):
         for i, (_, chunk) in enumerate(top_chunks)
     ) or 'Brak dokumentów w bazie wiedzy.'
 
-    system_prompt = _build_system_prompt(tenant, context_text)
+    system_prompt = _build_system_prompt(tenant['system_prompt'], tenant['tone'], tenant['bot_name'], context_text)
 
     # 5. Stream z Claude
     stream = anthropic.messages.stream(
@@ -80,17 +80,17 @@ def rag_query(tenant, user_message: str, conversation_id: str):
     return stream, sources
 
 
-def _build_system_prompt(tenant, context_text: str) -> str:
+def _build_system_prompt(system_prompt: str, tone: str, bot_name: str, context_text: str) -> str:
     tone_map = {
         'professional': 'Komunikuj się profesjonalnie i precyzyjnie.',
         'friendly':     'Komunikuj się ciepło i przyjaźnie.',
         'casual':       'Komunikuj się swobodnie i naturalnie.',
     }
-    tone = tone_map.get(tenant.tone, 'Komunikuj się profesjonalnie.')
+    tone_str = tone_map.get(tone, 'Komunikuj się profesjonalnie.')
 
-    return f"""{tenant.system_prompt}
+    return f"""{system_prompt}
 
-{tone}
+{tone_str}
 
 KONTEKST Z BAZY WIEDZY:
 ---
@@ -102,4 +102,4 @@ ZASADY:
 - Jeśli nie znasz odpowiedzi, powiedz to szczerze i zaproponuj kontakt z obsługą.
 - Bądź zwięzły — max 150 słów chyba że pytanie wymaga szczegółów.
 - Nie wymyślaj cen, faktów ani polityk których nie ma w kontekście.
-- Jesteś "{tenant.bot_name}", asystentem tej firmy."""
+- Jesteś "{bot_name}", asystentem tej firmy."""
