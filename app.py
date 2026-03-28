@@ -757,11 +757,16 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
     valid_value_ids: dict[str, set] = {}
 
     for p in params_def:
-        # Skip product-catalog parameters — they cannot be set at offer level
-        # Allegro marks them with offerScope=False (or requiredForProduct=True)
-        if p.get("offerScope") is False:
-            continue
-        if p.get("restrictions", {}).get("offerScope") is False:
+        # Skip product-catalog parameters — they cannot be set at offer level.
+        # Allegro nests this flag under options.offerScope OR restrictions.offerScope
+        offer_scope = (
+            p.get("offerScope")
+            or p.get("options", {}).get("offerScope")
+            or p.get("restrictions", {}).get("offerScope")
+        )
+        # offerScope=False means product-catalog only → skip
+        # offerScope=True or None/missing → include (assume offer-level is allowed)
+        if offer_scope is False:
             continue
 
         entry: dict = {"id": p["id"], "name": p["name"], "type": p["type"],
@@ -952,28 +957,48 @@ def publish_to_allegro(user: User, product_data: dict,
 
     resp = _post_offer(offer)
 
-    # Auto-retry: if Allegro rejects specific parameters (product-catalog scope),
-    # strip them out and try once more
-    if resp.status_code == 422 and offer.get("parameters"):
+    # Retry loop: Allegro may reject individual parameters (product-catalog scope,
+    # invalid valueId, etc.). Strip bad params and retry until offer succeeds or
+    # no more fixable parameter errors remain (max 6 attempts).
+    _PARAM_ERROR_CODES = {
+        "ParameterCategoryException",
+        "DictionaryParameterIdNotFound",
+        "ParameterValueNotAllowedException",
+        "ParameterRequiredException",
+    }
+    for _attempt in range(6):
+        if resp.ok or resp.status_code != 422 or not offer.get("parameters"):
+            break
         try:
             errs = resp.json().get("errors", [])
             bad_ids = set()
+            has_param_error = False
             for e in errs:
-                if e.get("code") in ("ParameterCategoryException", "DictionaryParameterIdNotFound",
-                                     "ParameterValueNotAllowedException"):
-                    # Extract param id from userMessage e.g. "Parameter `15851:Płeć`..."
-                    m = re.search(r"`(\d+):", e.get("userMessage", "") or e.get("message", ""))
-                    if m:
-                        bad_ids.add(m.group(1))
+                if e.get("path") == "parameters" or e.get("code") in _PARAM_ERROR_CODES:
+                    has_param_error = True
+                    # Extract param id from messages like "Parameter `54:Rozmiar`..."
+                    for text in (e.get("userMessage") or "", e.get("message") or "",
+                                 e.get("details") or ""):
+                        m = re.search(r"`(\d+)[:`]", text)
+                        if m:
+                            bad_ids.add(m.group(1))
+                            break
+            if not has_param_error:
+                break  # Error is unrelated to parameters — stop retrying
             if bad_ids:
-                app.logger.warning("Retrying without rejected params: %s", bad_ids)
+                app.logger.warning("Attempt %d: removing bad params %s", _attempt + 1, bad_ids)
                 offer["parameters"] = [p for p in offer["parameters"]
                                        if str(p.get("id")) not in bad_ids]
-                if not offer["parameters"]:
-                    del offer["parameters"]
-                resp = _post_offer(offer)
+            else:
+                # Can't identify specific bad param — drop all parameters and retry
+                app.logger.warning("Attempt %d: dropping all parameters", _attempt + 1)
+                del offer["parameters"]
+            if not offer.get("parameters"):
+                offer.pop("parameters", None)
+            resp = _post_offer(offer)
         except Exception as retry_err:
-            app.logger.warning("Retry logic failed: %s", retry_err)
+            app.logger.warning("Retry %d failed: %s", _attempt + 1, retry_err)
+            break
 
     if resp.ok:
         data      = resp.json()
