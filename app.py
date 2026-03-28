@@ -957,48 +957,21 @@ def publish_to_allegro(user: User, product_data: dict,
 
     resp = _post_offer(offer)
 
-    # Retry loop: Allegro may reject individual parameters (product-catalog scope,
-    # invalid valueId, etc.). Strip bad params and retry until offer succeeds or
-    # no more fixable parameter errors remain (max 6 attempts).
-    _PARAM_ERROR_CODES = {
-        "ParameterCategoryException",
-        "DictionaryParameterIdNotFound",
-        "ParameterValueNotAllowedException",
-        "ParameterRequiredException",
-    }
-    for _attempt in range(6):
-        if resp.ok or resp.status_code != 422 or not offer.get("parameters"):
-            break
+    # If any parameter-related error → drop ALL parameters and retry once.
+    # Individual param removal is unreliable since Allegro reports one error at a time.
+    if resp.status_code == 422 and offer.get("parameters"):
         try:
             errs = resp.json().get("errors", [])
-            bad_ids = set()
-            has_param_error = False
-            for e in errs:
-                if e.get("path") == "parameters" or e.get("code") in _PARAM_ERROR_CODES:
-                    has_param_error = True
-                    # Extract param id from messages like "Parameter `54:Rozmiar`..."
-                    for text in (e.get("userMessage") or "", e.get("message") or "",
-                                 e.get("details") or ""):
-                        m = re.search(r"`(\d+)[:`]", text)
-                        if m:
-                            bad_ids.add(m.group(1))
-                            break
-            if not has_param_error:
-                break  # Error is unrelated to parameters — stop retrying
-            if bad_ids:
-                app.logger.warning("Attempt %d: removing bad params %s", _attempt + 1, bad_ids)
-                offer["parameters"] = [p for p in offer["parameters"]
-                                       if str(p.get("id")) not in bad_ids]
-            else:
-                # Can't identify specific bad param — drop all parameters and retry
-                app.logger.warning("Attempt %d: dropping all parameters", _attempt + 1)
-                del offer["parameters"]
-            if not offer.get("parameters"):
+            param_error = any(
+                e.get("path") == "parameters" or "parameter" in (e.get("code") or "").lower()
+                for e in errs
+            )
+            if param_error:
+                app.logger.warning("Parameter errors — dropping all parameters and retrying")
                 offer.pop("parameters", None)
-            resp = _post_offer(offer)
+                resp = _post_offer(offer)
         except Exception as retry_err:
-            app.logger.warning("Retry %d failed: %s", _attempt + 1, retry_err)
-            break
+            app.logger.warning("Retry failed: %s", retry_err)
 
     if resp.ok:
         data      = resp.json()
