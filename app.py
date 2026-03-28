@@ -1012,10 +1012,11 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
         except Exception as e:
             app.logger.warning("AI parameter fill failed: %s", e)
 
-    result = direct_results + ai_results
     app.logger.info("Allegro params: %d direct + %d AI = %d total",
-                    len(direct_results), len(ai_results), len(result))
-    return result
+                    len(direct_results), len(ai_results),
+                    len(direct_results) + len(ai_results))
+    # Return separately so publish can protect user-provided params during retry
+    return direct_results, ai_results
 
 
 def publish_to_allegro(user: User, product_data: dict,
@@ -1069,14 +1070,16 @@ def publish_to_allegro(user: User, product_data: dict,
     vat     = opts.get("vat", {})
     pl_vat  = vat.get("pl", "23")
 
-    # Fill parameters via Claude — uses description + features for comprehensive filling
-    parameters = _fill_allegro_parameters(
+    # Fill parameters — returns (user_params, ai_params) separately
+    user_params, ai_params = _fill_allegro_parameters(
         access_token, category_id, merged_features,
         vat_rate=pl_vat,
         product_name=product_data.get("name", ""),
         product_description=product_data.get("short_description", "") or
                             _strip_html(product_data.get("description", ""))[:400],
     )
+    user_param_ids = {str(p["id"]) for p in user_params}
+    parameters = user_params + ai_params
 
     invoice = "WITHOUT_VAT" if pl_vat == "EXEMPT" else "VAT"
 
@@ -1157,36 +1160,59 @@ def publish_to_allegro(user: User, product_data: dict,
 
             # ── Extract bad param IDs from every error field ──
             bad_param_ids: set[str] = set()
+            is_param_error = False
             for e in errs:
-                # From path like "parameters[2]"
                 path = e.get("path") or ""
+                code = e.get("code") or ""
+
+                # From path like "parameters[2]"
                 m = re.match(r"parameters\[(\d+)\]", path)
                 if m and offer.get("parameters"):
                     idx = int(m.group(1))
-                    params = offer["parameters"]
-                    if idx < len(params):
-                        bad_param_ids.add(str(params[idx].get("id", "")))
+                    params_list = offer["parameters"]
+                    if idx < len(params_list):
+                        bad_param_ids.add(str(params_list[idx].get("id", "")))
 
-                # From userMessage / message — extract ONLY the specific param ID
-                # e.g. "Parameter `1294:Rodzaj` should not..." → only 1294, not all params
+                # From userMessage/message — "Parameter `1294:Rodzaj` should not..."
                 for field in ("userMessage", "message", "details"):
                     text = e.get(field) or ""
                     for match in re.finditer(r"\b(\d{2,})\s*:", text):
                         bad_param_ids.add(match.group(1))
 
+                if "parameter" in code.lower() or path.startswith("parameters"):
+                    is_param_error = True
+
             bad_param_ids.discard("")
 
             if bad_param_ids and offer.get("parameters"):
+                # Remove specific bad params — NEVER remove user-provided (Marka/Rozmiar)
+                removable = bad_param_ids - user_param_ids
+                protected = bad_param_ids & user_param_ids
+                if protected:
+                    app.logger.warning("Keeping protected user params: %s", protected)
                 before = len(offer["parameters"])
                 offer["parameters"] = [
                     p for p in offer["parameters"]
-                    if str(p.get("id", "")) not in bad_param_ids
+                    if str(p.get("id", "")) not in removable
                 ]
                 after = len(offer["parameters"])
-                app.logger.warning("Attempt %d: removed params %s (%d→%d)",
-                                   _attempt, bad_param_ids, before, after)
-                if after == before:
-                    # ID not found in our list — drop all to avoid infinite loop
+                app.logger.warning("Attempt %d: removed %s (%d→%d), kept user=%s",
+                                   _attempt, removable, before, after, protected)
+                if after == before and removable:
+                    # IDs not in our list — drop only AI params, keep user params
+                    app.logger.warning("Attempt %d: bad IDs not found, dropping AI params only", _attempt)
+                    offer["parameters"] = [p for p in offer["parameters"]
+                                           if str(p.get("id", "")) in user_param_ids]
+                    if not offer["parameters"]:
+                        offer.pop("parameters", None)
+                fixed = True
+
+            elif is_param_error and offer.get("parameters"):
+                # Generic param error, no specific ID — drop AI params, keep user params
+                app.logger.warning("Attempt %d: generic param error, dropping AI params", _attempt)
+                offer["parameters"] = [p for p in offer["parameters"]
+                                       if str(p.get("id", "")) in user_param_ids]
+                if not offer["parameters"]:
                     offer.pop("parameters", None)
                 fixed = True
 
@@ -1198,16 +1224,6 @@ def publish_to_allegro(user: User, product_data: dict,
             ):
                 app.logger.warning("Attempt %d: tax error — dropping taxSettings", _attempt)
                 offer.pop("taxSettings", None)
-                fixed = True
-
-            # Any other parameter error — drop all
-            elif offer.get("parameters") and any(
-                "parameter" in (e.get("code") or "").lower() or
-                (e.get("path") or "").startswith("parameters")
-                for e in errs
-            ):
-                app.logger.warning("Attempt %d: dropping all parameters", _attempt)
-                offer.pop("parameters", None)
                 fixed = True
 
             if not fixed:
