@@ -448,7 +448,19 @@
 
   // ── SVG Icons ──────────────────────────────────────────────
   function chatIcon() {
-    return '🤖';
+    const svg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+      <rect x="18" y="30" width="64" height="48" rx="12" fill="white"/>
+      <rect x="40" y="10" width="20" height="20" rx="10" fill="white"/>
+      <circle cx="50" cy="8" r="7" fill="white"/>
+      <circle cx="33" cy="50" r="9" fill="rgba(0,0,0,0.25)"/>
+      <circle cx="67" cy="50" r="9" fill="rgba(0,0,0,0.25)"/>
+      <circle cx="33" cy="50" r="4" fill="white"/>
+      <circle cx="67" cy="50" r="4" fill="white"/>
+      <rect x="30" y="64" width="40" height="7" rx="3.5" fill="rgba(0,0,0,0.25)"/>
+      <rect x="4" y="40" width="14" height="24" rx="7" fill="white"/>
+      <rect x="82" y="40" width="14" height="24" rx="7" fill="white"/>
+    </svg>`);
+    return `<img src="data:image/svg+xml,${svg}" width="44" height="44">`;
   }
   function closeIcon() {
     return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
