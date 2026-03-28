@@ -49,6 +49,7 @@
     }
     #cs-widget-btn:hover { transform: scale(1.08); box-shadow: 0 6px 24px rgba(0,0,0,0.3); }
     #cs-widget-btn svg { width: 28px; height: 28px; fill: white; }
+    #cs-widget-btn span { font-size: 38px !important; line-height: 1 !important; }
 
     #cs-widget {
       position: fixed; ${POSITION}: 24px; bottom: 24px;
@@ -447,7 +448,7 @@
 
   // ── SVG Icons ──────────────────────────────────────────────
   function chatIcon() {
-    return `<span style="font-size:32px;line-height:1;display:block">🤖</span>`;
+    return `<span style="font-size:38px!important;line-height:1!important;display:block!important;font-family:serif!important">🤖</span>`;
   }
   function closeIcon() {
     return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
