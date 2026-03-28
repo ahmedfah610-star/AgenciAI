@@ -7,19 +7,19 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0f0f11;
-    --surface: #17171a;
-    --surface2: #1e1e23;
-    --border: rgba(255,255,255,0.07);
-    --border2: rgba(255,255,255,0.13);
-    --text: #e8e8ec;
-    --muted: #7c7c8a;
+    --bg: #f5f6fa;
+    --surface: #ffffff;
+    --surface2: #eef0f6;
+    --border: rgba(0,0,0,0.08);
+    --border2: rgba(0,0,0,0.12);
+    --text: #111827;
+    --muted: #6b7280;
     --accent: #7c6af7;
     --accent2: #5e4fd6;
-    --green: #34d399;
-    --green-dim: rgba(52,211,153,0.12);
-    --red: #f87171;
-    --amber: #fbbf24;
+    --green: #059669;
+    --green-dim: rgba(5,150,105,0.08);
+    --red: #dc2626;
+    --amber: #d97706;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -147,7 +147,7 @@
   .image-thumb .thumb-remove {
     position: absolute;
     top: 5px; right: 5px;
-    background: rgba(15,15,17,0.8);
+    background: rgba(255,255,255,0.9);
     border: none;
     color: var(--red);
     cursor: pointer;
@@ -203,7 +203,7 @@
   .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
   .btn-publish {
     background: var(--green);
-    color: #0a1a12;
+    color: #fff;
     font-weight: 600;
     width: 100%;
     justify-content: center;
@@ -222,7 +222,7 @@
     align-items: center;
     gap: 10px;
   }
-  .status-bar.loading { display: flex; background: rgba(124,106,247,0.1); border: 1px solid rgba(124,106,247,0.2); color: #b0a4f9; }
+  .status-bar.loading { display: flex; background: rgba(124,106,247,0.08); border: 1px solid rgba(124,106,247,0.2); color: var(--accent2); }
   .status-bar.error   { display: flex; background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.2); color: var(--red); }
   .status-bar.success { display: flex; background: var(--green-dim); border: 1px solid rgba(52,211,153,0.2); color: var(--green); }
   .spinner {
@@ -276,9 +276,9 @@
   }
   .tags-input:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,106,247,0.12); }
   .tag-pill {
-    background: rgba(124,106,247,0.18);
-    border: 1px solid rgba(124,106,247,0.3);
-    color: #b0a4f9;
+    background: rgba(124,106,247,0.1);
+    border: 1px solid rgba(124,106,247,0.25);
+    color: var(--accent2);
     font-size: 12px;
     padding: 2px 8px 2px 10px;
     border-radius: 20px;
@@ -386,7 +386,7 @@
   .platform-row {
     display: flex; align-items: center; gap: 10px;
     padding: 10px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
     font-size: 13px;
   }
   .platform-row:last-child { border-bottom: none; padding-bottom: 0; }
@@ -446,7 +446,7 @@
   .modal label { font-size: 11px; font-weight: 500; color: var(--muted);
     letter-spacing: .8px; text-transform: uppercase; display: block; margin-bottom: 6px; margin-top: 12px; }
   .modal input[type=text], .modal input[type=url], .modal input[type=password] {
-    width: 100%; padding: 10px 14px; background: #0f0f11; border: 1px solid var(--border2);
+    width: 100%; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border2);
     border-radius: 9px; color: var(--text); font-size: 14px; font-family: inherit;
     transition: border-color .15s; outline: none;
   }
@@ -548,7 +548,7 @@
 
       <div class="modal-section">Sklep WordPress / WooCommerce</div>
 
-      <div style="background:rgba(124,106,247,0.08);border:1px solid rgba(124,106,247,0.2);border-radius:10px;padding:12px 14px;font-size:12px;color:#b0a4f9;margin-bottom:4px;line-height:1.6;">
+      <div style="background:rgba(124,106,247,0.08);border:1px solid rgba(124,106,247,0.2);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--accent2);margin-bottom:4px;line-height:1.6;">
         🔑 <b>Jak wygenerować hasło aplikacji:</b><br>
         WP Admin → Użytkownicy → Twój profil → przewiń na dół →<br>
         <b>Hasła aplikacji</b> → wpisz nazwę „WooAI" → kliknij Dodaj → skopiuj hasło
