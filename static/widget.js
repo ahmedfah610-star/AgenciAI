@@ -41,7 +41,7 @@
   const css = `
     #cs-widget-btn {
       position: fixed; ${POSITION}: 24px; bottom: 24px;
-      width: 60px; height: 60px; border-radius: 50%;
+      width: 64px; height: 64px; border-radius: 50%;
       background: var(--cs-color); border: none; cursor: pointer;
       box-shadow: 0 4px 20px rgba(0,0,0,0.25);
       display: flex; align-items: center; justify-content: center;
@@ -447,7 +447,7 @@
 
   // ── SVG Icons ──────────────────────────────────────────────
   function chatIcon() {
-    return `<span style="font-size:28px;line-height:1">🤖</span>`;
+    return `<span style="font-size:32px;line-height:1;display:block">🤖</span>`;
   }
   function closeIcon() {
     return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
