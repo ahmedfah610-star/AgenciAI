@@ -137,20 +137,47 @@ def _process_text(source_id, tenant_id, text, metadata):
 
 # ── Ekstrakcja tekstu ────────────────────────────────────────
 
-def _scrape_url(url: str) -> str:
-    resp = requests.get(
-        url,
-        timeout=15,
-        headers={'User-Agent': 'AgenciAI-Bot/1.0 (knowledge ingestion)'},
-        allow_redirects=True,
-    )
-    resp.raise_for_status()
-    soup = BeautifulSoup(resp.text, 'html.parser')
-    for tag in soup(['script', 'style', 'nav', 'footer', 'header']):
-        tag.decompose()
-    title = soup.title.string if soup.title else ''
-    body = soup.get_text(separator='\n', strip=True)
-    return f'{title}\n\n{body}'
+def _scrape_url(url: str, max_pages: int = 20) -> str:
+    """Scrapuje stronę główną + podstrony (max_pages)."""
+    from urllib.parse import urljoin, urlparse
+
+    base = urlparse(url)
+    base_origin = f'{base.scheme}://{base.netloc}'
+    visited = set()
+    queue = [url]
+    all_texts = []
+
+    headers = {'User-Agent': 'AgenciAI-Bot/1.0 (knowledge ingestion)'}
+
+    while queue and len(visited) < max_pages:
+        current = queue.pop(0)
+        if current in visited:
+            continue
+        visited.add(current)
+
+        try:
+            resp = requests.get(current, timeout=15, headers=headers, allow_redirects=True)
+            if not resp.ok or 'text/html' not in resp.headers.get('Content-Type', ''):
+                continue
+            soup = BeautifulSoup(resp.text, 'html.parser')
+
+            # Zbierz linki wewnętrzne
+            for a in soup.find_all('a', href=True):
+                href = urljoin(current, a['href']).split('#')[0].split('?')[0]
+                if href.startswith(base_origin) and href not in visited:
+                    queue.append(href)
+
+            # Wyciągnij tekst
+            for tag in soup(['script', 'style', 'nav', 'footer', 'header']):
+                tag.decompose()
+            title = soup.title.string.strip() if soup.title else ''
+            body = soup.get_text(separator='\n', strip=True)
+            all_texts.append(f'=== {title or current} ===\n{body}')
+
+        except Exception:
+            continue
+
+    return '\n\n'.join(all_texts)
 
 
 def _extract_pdf(file_path: str) -> str:
