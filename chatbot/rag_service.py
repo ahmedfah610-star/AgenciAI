@@ -88,18 +88,14 @@ def _build_system_prompt(system_prompt: str, tone: str, bot_name: str, context_t
     }
     tone_str = tone_map.get(tone, 'Komunikuj się profesjonalnie.')
 
-    return f"""{system_prompt}
+    return f"""Jesteś "{bot_name}". {tone_str}
 
-{tone_str}
+TWOJE INSTRUKCJE (najwyższy priorytet — stosuj się bezwzględnie):
+{system_prompt}
 
-KONTEKST Z BAZY WIEDZY:
+WIEDZA O FIRMIE:
 ---
 {context_text}
 ---
 
-ZASADY:
-- Odpowiadaj TYLKO na podstawie podanego kontekstu jeśli to możliwe.
-- Jeśli nie znasz odpowiedzi, powiedz to szczerze i zaproponuj kontakt z obsługą.
-- Bądź zwięzły — max 150 słów chyba że pytanie wymaga szczegółów.
-- Nie wymyślaj cen, faktów ani polityk których nie ma w kontekście.
-- Jesteś "{bot_name}", asystentem tej firmy."""
+Jeśli pytanie dotyczy czegoś czego nie ma w wiedzy, powiedz szczerze i zaproponuj kontakt z obsługą. Nie wymyślaj faktów ani cen."""
