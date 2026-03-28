@@ -1165,21 +1165,12 @@ def publish_to_allegro(user: User, product_data: dict,
                     if idx < len(params):
                         bad_param_ids.add(str(params[idx].get("id", "")))
 
-                # From userMessage / message — match any digits before colon
-                # e.g. "Parameter `1294:Rodzaj` should not..." or "Parameter 54:Rozmiar..."
+                # From userMessage / message — extract ONLY the specific param ID
+                # e.g. "Parameter `1294:Rodzaj` should not..." → only 1294, not all params
                 for field in ("userMessage", "message", "details"):
                     text = e.get(field) or ""
                     for match in re.finditer(r"\b(\d{2,})\s*:", text):
                         bad_param_ids.add(match.group(1))
-
-                # From ParameterCategoryException code — mark any param in path
-                code = (e.get("code") or "")
-                if "ParameterCategory" in code and path.startswith("parameters"):
-                    # path = "parameters" → drop all
-                    bad_param_ids.update(
-                        str(p.get("id", "")) for p in (offer.get("parameters") or [])
-                        if p.get("id")
-                    )
 
             bad_param_ids.discard("")
 
@@ -1193,7 +1184,7 @@ def publish_to_allegro(user: User, product_data: dict,
                 app.logger.warning("Attempt %d: removed params %s (%d→%d)",
                                    _attempt, bad_param_ids, before, after)
                 if after == before:
-                    # Nothing removed — avoid infinite loop, drop all
+                    # ID not found in our list — drop all to avoid infinite loop
                     offer.pop("parameters", None)
                 fixed = True
 
