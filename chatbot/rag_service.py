@@ -6,7 +6,6 @@ import os
 import json
 from anthropic import Anthropic
 from .embedding_service import embed, cosine_similarity
-from .models import KnowledgeChunk, ChatMessage, Conversation
 
 anthropic = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
 CHAT_MODEL = os.getenv('ANTHROPIC_CHAT_MODEL', 'claude-haiku-4-5-20251001')
@@ -20,6 +19,8 @@ def rag_query(tenant, user_message: str, conversation_id: str):
     Główna funkcja RAG.
     Zwraca generator (stream) tokenów Claude + listę źródeł.
     """
+    from .models import KnowledgeChunk, ChatMessage
+
     # 1. Embed zapytania użytkownika
     query_vec = embed(user_message)
 
@@ -38,7 +39,7 @@ def rag_query(tenant, user_message: str, conversation_id: str):
     scored.sort(key=lambda x: x[0], reverse=True)
     top_chunks = scored[:TOP_K]
 
-    # 3. Historia rozmowy
+    # 3. Historia rozmowy (ChatMessage już zaimportowany wyżej)
     history_msgs = ChatMessage.query.filter_by(
         conversation_id=conversation_id
     ).order_by(ChatMessage.created_at.desc()).limit(HISTORY_N).all()
