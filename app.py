@@ -732,9 +732,17 @@ def _find_allegro_category(access_token: str, category_name: str,
 
 
 def _fill_allegro_parameters(access_token: str, category_id: str,
-                              features: dict) -> list:
-    """Fetch required/available parameters for category and fill from product features."""
-    if not features:
+                              features: dict, vat_rate: str = "") -> list:
+    """Fetch required/available parameters for category and fill from product features.
+    vat_rate: user-chosen VAT rate string e.g. '23', '8' — injected as 'Stawka VAT' feature.
+    """
+    merged = dict(features or {})
+    # Inject user-selected VAT so 'Stawka VAT' category parameter can be matched
+    if vat_rate and vat_rate != "EXEMPT":
+        # Allegro stores it as e.g. "23%" — add both variants so matching works
+        merged.setdefault("Stawka VAT", f"{vat_rate}%")
+        merged.setdefault("VAT", f"{vat_rate}%")
+    if not merged:
         return []
     headers = _allegro_bearer_headers(access_token)
     resp = requests.get(
@@ -839,13 +847,14 @@ def publish_to_allegro(user: User, product_data: dict,
         if brand_candidate:
             merged_features["Marka"] = brand_candidate
 
-    # Fill parameters from detected features
-    parameters = _fill_allegro_parameters(access_token, category_id, merged_features)
-
-    opts = allegro_options or {}
-
+    opts    = allegro_options or {}
     vat     = opts.get("vat", {})
     pl_vat  = vat.get("pl", "23")
+
+    # Fill parameters from detected features + user VAT rate
+    parameters = _fill_allegro_parameters(access_token, category_id, merged_features,
+                                          vat_rate=pl_vat)
+
     invoice = "WITHOUT_VAT" if pl_vat == "EXEMPT" else "VAT"
 
     offer: dict = {
@@ -872,7 +881,11 @@ def publish_to_allegro(user: User, product_data: dict,
     if shipping_rate_id:
         offer["delivery"]["shippingRates"] = {"id": shipping_rate_id}
 
-    # Only attach parameters when non-empty
+    # One Fulfillment by Allegro (only when explicitly selected — SELF requires no field)
+    if opts.get("fulfillment") == "ONE_FULFILLMENT":
+        offer["fulfillment"] = {"availabilityCode": "ONE_FULFILLMENT"}
+
+    # Parameters (VAT + product features matched to category params)
     if parameters:
         offer["parameters"] = parameters
 
