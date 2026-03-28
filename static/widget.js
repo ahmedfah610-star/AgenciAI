@@ -447,16 +447,7 @@
 
   // ── SVG Icons ──────────────────────────────────────────────
   function chatIcon() {
-    return `<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="white">
-      <rect x="16" y="20" width="32" height="28" rx="6"/>
-      <rect x="28" y="10" width="8" height="10" rx="4"/>
-      <line x1="32" y1="10" x2="32" y2="20" stroke="white" stroke-width="2"/>
-      <circle cx="24" cy="32" r="3" fill="var(--cs-color)"/>
-      <circle cx="40" cy="32" r="3" fill="var(--cs-color)"/>
-      <rect x="24" y="38" width="16" height="3" rx="1.5" fill="var(--cs-color)"/>
-      <rect x="10" y="30" width="6" height="10" rx="3"/>
-      <rect x="48" y="30" width="6" height="10" rx="3"/>
-    </svg>`;
+    return `<span style="font-size:28px;line-height:1">🤖</span>`;
   }
   function closeIcon() {
     return `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
