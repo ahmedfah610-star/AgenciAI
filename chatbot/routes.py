@@ -333,11 +333,23 @@ def list_sources():
     m       = get_models()
     sources = m.KnowledgeSource.query.filter_by(tenant_id=tenant.id).order_by(
                   m.KnowledgeSource.created_at.desc()).all()
-    return jsonify([{
-        'id': s.id, 'type': s.type, 'name': s.name, 'status': s.status,
-        'chunk_count': s.chunk_count, 'error_message': s.error_message,
-        'last_synced_at': s.last_synced_at.isoformat() if s.last_synced_at else None,
-    } for s in sources])
+    result = []
+    for s in sources:
+        # Pobierz unikalne URL-e z metadanych chunków
+        chunks = m.KnowledgeChunk.query.filter_by(source_id=s.id).all()
+        crawled = []
+        for c in chunks:
+            pages = (c.metadata_ or {}).get('crawled_pages', [])
+            for p in pages:
+                if p not in crawled:
+                    crawled.append(p)
+        result.append({
+            'id': s.id, 'type': s.type, 'name': s.name, 'status': s.status,
+            'chunk_count': s.chunk_count, 'error_message': s.error_message,
+            'crawled_pages': crawled,
+            'last_synced_at': s.last_synced_at.isoformat() if s.last_synced_at else None,
+        })
+    return jsonify(result)
 
 
 @chatbot_bp.route('/dashboard/conversations/<conv_id>/messages')

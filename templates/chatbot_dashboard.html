@@ -235,13 +235,15 @@
           {% for s in sources %}
           <div class="source-item" id="source-{{ s.id }}">
             <div class="source-status status-{{ s.status }}"></div>
-            <div class="source-info">
+            <div class="source-info" style="cursor:pointer" onclick="togglePages('{{ s.id }}')">
               <div class="source-name">{{ s.name }}</div>
               <div class="source-meta">
                 {{ s.type|upper }}
                 {% if s.chunk_count %} · {{ s.chunk_count }} fragmentów{% endif %}
                 {% if s.error_message %} · <span style="color:#ff3b30">{{ s.error_message }}</span>{% endif %}
+                {% if s.type == 'url' %}<span style="color:#0071e3;font-size:12px"> · kliknij aby zobaczyć strony</span>{% endif %}
               </div>
+              <div id="pages-{{ s.id }}" style="display:none;margin-top:8px;font-size:12px;color:#555;line-height:1.8"></div>
             </div>
             <button class="btn btn-danger" style="padding:6px 12px;font-size:12px" onclick="deleteSource('{{ s.id }}')">Usuń</button>
           </div>
@@ -450,6 +452,27 @@ function addSourceToList(id, name, type, status) {
         `${src.type?.toUpperCase()} · ${src.chunk_count} fragmentów`;
     }
   }, 3000);
+}
+
+// ── Crawled pages toggle ─────────────────────────────────────
+async function togglePages(sourceId) {
+  const box = document.getElementById('pages-' + sourceId);
+  if (box.style.display !== 'none') { box.style.display = 'none'; return; }
+  if (box.dataset.loaded) { box.style.display = 'block'; return; }
+
+  box.style.display = 'block';
+  box.textContent = 'Ładowanie...';
+  const r = await fetch('/chatbot/dashboard/knowledge/sources');
+  const sources = await r.json();
+  const src = sources.find(s => s.id === sourceId);
+  const pages = src?.crawled_pages || [];
+  if (pages.length === 0) {
+    box.innerHTML = '<em>Brak danych — dodaj źródło ponownie aby zobaczyć strony</em>';
+  } else {
+    box.innerHTML = '<strong>Przeskanowane strony (' + pages.length + '):</strong><br>' +
+      pages.map(p => `<a href="${p}" target="_blank" style="color:#0071e3;display:block;margin-top:2px">${p}</a>`).join('');
+  }
+  box.dataset.loaded = '1';
 }
 
 // ── Conversations ────────────────────────────────────────────

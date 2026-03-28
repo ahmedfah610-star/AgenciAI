@@ -63,8 +63,13 @@ def _run_in_context(app, fn, *args):
 def _ingest_url(source_id, tenant_id, url):
     _set_status(source_id, 'processing')
     try:
-        text = _scrape_url(url)
-        _process_text(source_id, tenant_id, text, {'url': url})
+        pages = _scrape_url(url)
+        if not pages:
+            raise ValueError('Brak treści do przetworzenia')
+        # Każda strona osobno z własnym URL w metadanych
+        combined_text = '\n\n'.join(f'=== {title} ===\n{body}' for _, title, body in pages)
+        crawled_urls = [page_url for page_url, _, _ in pages]
+        _process_text(source_id, tenant_id, combined_text, {'url': url, 'crawled_pages': crawled_urls})
     except Exception as e:
         _set_status(source_id, 'failed', str(e))
 
@@ -202,7 +207,7 @@ def _scrape_url(url: str, max_pages: int = 10) -> str:
                 tag.decompose()
             title = soup.title.string.strip() if soup.title else current
             body = soup.get_text(separator='\n', strip=True)
-            all_texts.append(f'=== {title} ===\nURL: {current}\n{body}')
+            all_texts.append((current, title, body))
             print(f'[Crawler] {len(visited)}/{max_pages} — {current}')
 
         except Exception as e:
@@ -210,7 +215,7 @@ def _scrape_url(url: str, max_pages: int = 10) -> str:
             continue
 
     print(f'[Crawler] Zakończono — przeskanowano {len(visited)} stron')
-    return '\n\n'.join(all_texts)
+    return all_texts
 
 
 def _extract_pdf(file_path: str) -> str:
