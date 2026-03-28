@@ -852,11 +852,26 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
     if vat_rate and vat_rate != "EXEMPT":
         merged_features.setdefault("Stawka VAT", f"{vat_rate}%")
 
+    # Highlight key features the user explicitly provided
+    priority_hints = []
+    if merged_features.get("Marka"):
+        priority_hints.append(f"Brand/Marka: \"{merged_features['Marka']}\"")
+    if merged_features.get("Rozmiar"):
+        priority_hints.append(f"Size/Rozmiar: \"{merged_features['Rozmiar']}\"")
+    if merged_features.get("Kolor"):
+        priority_hints.append(f"Color/Kolor: \"{merged_features['Kolor']}\"")
+    priority_section = (
+        "\nPRIORITY — always fill these if matching parameter exists:\n" +
+        "\n".join(f"  - {h}" for h in priority_hints) + "\n"
+        if priority_hints else ""
+    )
+
     prompt = (
         "Fill Allegro listing parameters for a Polish e-commerce product.\n\n"
         f"Product name: {product_name}\n"
         f"Short description: {product_description[:400]}\n"
-        f"Detected features: {json.dumps(merged_features, ensure_ascii=False)}\n\n"
+        f"Detected features: {json.dumps(merged_features, ensure_ascii=False)}\n"
+        f"{priority_section}\n"
         "Parameters to fill:\n"
         f"{json.dumps(params_for_ai, ensure_ascii=False)[:4000]}\n\n"
         "CRITICAL RULES:\n"
@@ -864,8 +879,9 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
         "   NEVER use the 'label'. Example: if options=[{valueId:'11323_1',label:'Nowy'}]\n"
         "   then output: {\"id\":\"11323\",\"valuesIds\":[\"11323_1\"]}\n"
         "2. For 'string' type: {\"id\":\"...\",\"values\":[\"Polish text\"]}\n"
+        "   For Marka/Brand string params: use the exact brand name from PRIORITY section.\n"
         "3. For 'integer'/'float' type: {\"id\":\"...\",\"values\":[\"42\"]}\n"
-        "4. Only include parameters you can confidently fill.\n"
+        "4. Fill as many parameters as possible using the product info and detected features.\n"
         "5. Respond ONLY with a JSON array — no markdown, no explanation.\n\n"
         "Output format: [{\"id\":\"param_id\",\"valuesIds\":[\"valueId\"]}, ...]"
     )
@@ -948,13 +964,19 @@ def publish_to_allegro(user: User, product_data: dict,
 
     # Supplement features with brand from topic if not already present
     merged_features = dict(features or {})
+    # Extract brand from topic: first capitalized word that looks like a proper noun
+    # e.g. "Nike bluza czerwona" → "Nike", "Adidas Originals hoodie" → "Adidas Originals"
     if topic and not merged_features.get("Marka"):
-        brand_candidate = " ".join(
-            w for w in topic.split()
-            if w and w[0].isupper() and len(w) > 1
-        )
-        if brand_candidate:
-            merged_features["Marka"] = brand_candidate
+        words = topic.split()
+        brand_words = []
+        for w in words:
+            clean = w.strip(",.!?\"'")
+            if clean and clean[0].isupper() and len(clean) > 1:
+                brand_words.append(clean)
+            elif brand_words:
+                break  # stop at first non-capitalized word after brand started
+        if brand_words:
+            merged_features["Marka"] = " ".join(brand_words)
 
     opts    = allegro_options or {}
     vat     = opts.get("vat", {})
