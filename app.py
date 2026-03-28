@@ -732,18 +732,10 @@ def _find_allegro_category(access_token: str, category_name: str,
 
 
 def _fill_allegro_parameters(access_token: str, category_id: str,
-                              features: dict, vat_rate: str = "") -> list:
-    """Fetch required/available parameters for category and fill from product features.
-    vat_rate: user-chosen VAT rate string e.g. '23', '8' — injected as 'Stawka VAT' feature.
-    """
-    merged = dict(features or {})
-    # Inject user-selected VAT so 'Stawka VAT' category parameter can be matched
-    if vat_rate and vat_rate != "EXEMPT":
-        # Allegro stores it as e.g. "23%" — add both variants so matching works
-        merged.setdefault("Stawka VAT", f"{vat_rate}%")
-        merged.setdefault("VAT", f"{vat_rate}%")
-    if not merged:
-        return []
+                              features: dict, vat_rate: str = "",
+                              product_name: str = "",
+                              product_description: str = "") -> list:
+    """Use Claude to intelligently fill all available category parameters."""
     headers = _allegro_bearer_headers(access_token)
     resp = requests.get(
         f"{ALLEGRO_API_BASE}/sale/categories/{category_id}/parameters",
@@ -755,55 +747,58 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
         return []
 
     params_def = resp.json().get("parameters", [])
-    result = []
-    features_lower = {k.lower(): v for k, v in features.items()}
+    if not params_def:
+        return []
 
-    for param in params_def:
-        param_id      = param.get("id")
-        param_name    = param.get("name", "")
-        param_type    = param.get("type", "")
-        restrictions  = param.get("restrictions", {})
+    # Build compact param list for Claude — include allowed values for dictionary types
+    params_for_ai = []
+    for p in params_def:
+        entry: dict = {"id": p["id"], "name": p["name"], "type": p["type"],
+                       "required": p.get("required", False)}
+        if p.get("dictionaryValues"):
+            entry["allowed"] = [[v["id"], v["value"]] for v in p["dictionaryValues"][:40]]
+        if p.get("restrictions", {}).get("maxLength"):
+            entry["maxLength"] = p["restrictions"]["maxLength"]
+        params_for_ai.append(entry)
 
-        # Match parameter name against feature keys (case-insensitive)
-        matched_val = features.get(param_name) or features_lower.get(param_name.lower())
-        if not matched_val:
-            continue
+    merged_features = dict(features or {})
+    if vat_rate and vat_rate != "EXEMPT":
+        merged_features.setdefault("Stawka VAT", f"{vat_rate}%")
 
-        matched_val_str = str(matched_val).strip()
-        if not matched_val_str:
-            continue
+    prompt = (
+        "You are filling in Allegro listing parameters for a Polish e-commerce offer.\n\n"
+        f"Product name: {product_name}\n"
+        f"Short description: {product_description[:400]}\n"
+        f"Detected features: {json.dumps(merged_features, ensure_ascii=False)}\n\n"
+        "Available category parameters:\n"
+        f"{json.dumps(params_for_ai, ensure_ascii=False)[:4000]}\n\n"
+        "Rules:\n"
+        "- dictionary type: pick the EXACT value id from 'allowed' list — use [id, value] pairs\n"
+        "- string type: write appropriate Polish text\n"
+        "- integer/float type: write just the number as string\n"
+        "- Only fill parameters you are confident about\n"
+        "- For 'Stawka VAT' always use the value from detected features if present\n\n"
+        "Respond ONLY with a JSON array, no markdown:\n"
+        '[{"id": "param_id", "valuesIds": ["value_id"]}, '
+        '{"id": "param_id2", "values": ["text"]}, ...]'
+    )
 
-        try:
-            if param_type == "dictionary":
-                dict_values = param.get("dictionaryValues", [])
-                mv_lower    = matched_val_str.lower()
-                found_id    = None
-                # exact match first
-                for dv in dict_values:
-                    if dv["value"].lower() == mv_lower:
-                        found_id = dv["id"]
-                        break
-                # partial match
-                if not found_id:
-                    for dv in dict_values:
-                        dv_lower = dv["value"].lower()
-                        if mv_lower in dv_lower or dv_lower in mv_lower:
-                            found_id = dv["id"]
-                            break
-                if found_id:
-                    result.append({"id": param_id, "valuesIds": [found_id]})
-            elif param_type == "string":
-                max_len = restrictions.get("maxLength", 200)
-                result.append({"id": param_id, "values": [matched_val_str[:max_len]]})
-            elif param_type in ("integer", "float"):
-                val = str(int(float(matched_val_str)) if param_type == "integer"
-                          else round(float(matched_val_str), 2))
-                result.append({"id": param_id, "values": [val]})
-        except Exception as e:
-            app.logger.debug("Parameter %s (%s) fill error: %s", param_name, param_type, e)
+    try:
+        ai_resp = anthropic_client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=800,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = ai_resp.content[0].text.strip()
+        raw = re.sub(r"^```(?:json)?|```$", "", raw, flags=re.MULTILINE).strip()
+        result = json.loads(raw)
+        if isinstance(result, list):
+            app.logger.info("Allegro AI parameters filled: %d items", len(result))
+            return result
+    except Exception as e:
+        app.logger.warning("AI parameter fill failed: %s", e)
 
-    app.logger.info("Allegro parameters filled: %d / %d", len(result), len(params_def))
-    return result
+    return []
 
 
 def publish_to_allegro(user: User, product_data: dict,
@@ -851,9 +846,14 @@ def publish_to_allegro(user: User, product_data: dict,
     vat     = opts.get("vat", {})
     pl_vat  = vat.get("pl", "23")
 
-    # Fill parameters from detected features + user VAT rate
-    parameters = _fill_allegro_parameters(access_token, category_id, merged_features,
-                                          vat_rate=pl_vat)
+    # Fill parameters via Claude — uses description + features for comprehensive filling
+    parameters = _fill_allegro_parameters(
+        access_token, category_id, merged_features,
+        vat_rate=pl_vat,
+        product_name=product_data.get("name", ""),
+        product_description=product_data.get("short_description", "") or
+                            _strip_html(product_data.get("description", ""))[:400],
+    )
 
     invoice = "WITHOUT_VAT" if pl_vat == "EXEMPT" else "VAT"
 
@@ -964,7 +964,8 @@ def analyze():
 
         vision_result   = analyze_images(images, topic=topic)
         features        = dict(vision_result.get("features", {}))
-        suggested_topic = vision_result.get("suggested_topic", "")
+        # Only suggest topic when user left the field empty
+        suggested_topic = "" if topic else vision_result.get("suggested_topic", "")
 
         # If user provided a topic and it contains a likely brand (capitalized word(s)),
         # supplement features["Marka"] when AI didn't detect one from the image
