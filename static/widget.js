@@ -51,8 +51,8 @@
     #cs-widget-btn svg { width: 28px; height: 28px; fill: white; }
 
     #cs-widget {
-      position: fixed; ${POSITION}: 24px; bottom: 96px;
-      width: 360px; max-height: 520px; height: auto;
+      position: fixed; ${POSITION}: 24px; bottom: 24px;
+      width: 360px; max-height: 560px; height: auto;
       background: #fff; border-radius: 16px;
       box-shadow: 0 8px 40px rgba(0,0,0,0.18);
       display: flex; flex-direction: column;
