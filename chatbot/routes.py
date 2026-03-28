@@ -140,19 +140,17 @@ def send_message():
 
     def generate():
         full_response = ''
+        sources = []
         start = datetime.utcnow()
-        yield f'event: meta\ndata: {json.dumps({"conversationId": conv_id})}\n\n'
+        yield f'data: {json.dumps({"conversationId": conv_id})}\n\n'
         try:
             stream, sources = rag_query(tenant, message, conv_id)
             with stream as s:
-                for event in s:
-                    if (event.type == 'content_block_delta'
-                            and hasattr(event.delta, 'text')):
-                        token = event.delta.text
-                        full_response += token
-                        yield f'data: {json.dumps({"text": token})}\n\n'
+                for text in s.text_stream:
+                    full_response += text
+                    yield f'data: {json.dumps({"text": text})}\n\n'
         except Exception as e:
-            yield f'event: error\ndata: {json.dumps({"message": str(e)})}\n\n'
+            yield f'data: {json.dumps({"error": str(e)})}\n\n'
             return
 
         latency = int((datetime.utcnow() - start).total_seconds() * 1000)

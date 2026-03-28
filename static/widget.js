@@ -341,6 +341,10 @@
               const data = JSON.parse(line.slice(5).trim());
               if (data.conversationId) conversationId = data.conversationId;
             }
+            if (payload.error) {
+              botDiv.innerHTML = esc(payload.error);
+              scrollToBottom();
+            }
             if (payload.text) {
               fullText += payload.text;
               botDiv.innerHTML = linkify(esc(fullText)) + '<span class="cs-cursor">▍</span>';
