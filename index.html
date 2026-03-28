@@ -880,6 +880,20 @@
               </div>
             </div>
 
+            <!-- Marka / Rozmiar -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+              <div>
+                <div class="adv-label">Marka</div>
+                <input type="text" id="al-marka" placeholder="np. Nike, Adidas…"
+                  style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);font-size:13px;color:var(--text);font-family:inherit;box-sizing:border-box;">
+              </div>
+              <div>
+                <div class="adv-label">Rozmiar</div>
+                <input type="text" id="al-rozmiar" placeholder="np. XL, 42, M…"
+                  style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border2);background:var(--surface2);font-size:13px;color:var(--text);font-family:inherit;box-sizing:border-box;">
+              </div>
+            </div>
+
             <!-- Handling time -->
             <div>
               <div class="adv-label">Czas wysyłki (od zamówienia)</div>
@@ -1224,6 +1238,11 @@ analyzeBtn.addEventListener('click', async () => {
     if (!resp.ok || !data.success) throw new Error(data.error || 'Unknown error');
 
     currentFeatures = data.features || {};
+    // Auto-fill Marka/Rozmiar inputs if detected and field is empty
+    if (currentFeatures.Marka && !document.getElementById('al-marka').value.trim())
+      document.getElementById('al-marka').value = currentFeatures.Marka;
+    if (currentFeatures.Rozmiar && !document.getElementById('al-rozmiar').value.trim())
+      document.getElementById('al-rozmiar').value = currentFeatures.Rozmiar;
     // Suggest topic only if user left it empty
     const topicInput = document.getElementById('topic-input');
     if (!topicInput.value.trim() && data.suggested_topic) {
@@ -1478,7 +1497,13 @@ document.getElementById('publish-btn').addEventListener('click', async () => {
   const formData = new FormData();
   formData.append('product', JSON.stringify(product));
   formData.append('targets', JSON.stringify(targets));
-  formData.append('features', JSON.stringify(currentFeatures));
+  // Merge manually entered Marka/Rozmiar into features (override auto-detected)
+  const publishFeatures = Object.assign({}, currentFeatures);
+  const markaVal   = document.getElementById('al-marka').value.trim();
+  const rozmiarVal = document.getElementById('al-rozmiar').value.trim();
+  if (markaVal)   publishFeatures['Marka']   = markaVal;
+  if (rozmiarVal) publishFeatures['Rozmiar'] = rozmiarVal;
+  formData.append('features', JSON.stringify(publishFeatures));
   const topicVal = document.getElementById('topic-input').value.trim();
   if (topicVal) formData.append('topic', topicVal);
   // Allegro advanced options
