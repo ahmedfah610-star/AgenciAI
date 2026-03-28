@@ -151,9 +151,10 @@
         {% if api_keys %}
         <div class="snippet" id="snippet-box">
 &lt;script
-  src="{{ request.host_url }}chatbot/widget.js"
+  src="https://web-production-88bdbe.up.railway.app/chatbot/widget.js"
   data-key="{{ api_keys[0].key_prefix }}••••••••"
-  data-api-url="{{ request.host_url.rstrip('/') }}"&gt;
+  data-api-url="https://web-production-88bdbe.up.railway.app"
+  defer&gt;
 &lt;/script&gt;
           <button class="copy-btn" onclick="copySnippet()">Kopiuj</button>
         </div>
