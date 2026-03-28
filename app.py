@@ -1001,9 +1001,10 @@ def health():
 
 # ─── ChatBot Module ───────────────────────────────────────────────────────────
 
+from chatbot.models import init_models
+init_models(db)   # rejestruje modele używając istniejącego db (bez circular import)
+
 from chatbot import chatbot_bp
-from chatbot.models import (ChatTenant, ChatApiKey, KnowledgeSource,
-                             KnowledgeChunk, Conversation, ChatMessage)
 app.register_blueprint(chatbot_bp)
 
 # ─── Init DB + Run ────────────────────────────────────────────────────────────
