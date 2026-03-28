@@ -935,18 +935,20 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
                 continue
 
         # ── Everything else: only offer-scope params go to Claude ──
-        # NOTE: cannot use `or` chain — False or None = None, not False!
-        def _offer_scope(param):
-            for val in [
-                param.get("offerScope"),
-                param.get("options", {}).get("offerScope"),
-                param.get("restrictions", {}).get("offerScope"),
-            ]:
-                if val is not None:
-                    return val
-            return None
-        if _offer_scope(p) is False:
-            continue  # skip product-catalog-only params for Claude
+        # Check every known location where Allegro stores offerScope
+        raw_scope = None
+        for candidate in [
+            p.get("offerScope"),
+            p.get("options", {}).get("offerScope"),
+            p.get("restrictions", {}).get("offerScope"),
+        ]:
+            if candidate is not None:
+                raw_scope = candidate
+                break
+        app.logger.info("Param %s (%s): offerScope raw=%r → skip=%s",
+                        param_name, param_id, raw_scope, raw_scope is False)
+        if raw_scope is False:
+            continue  # skip product-catalog-only params
 
         entry: dict = {"id": param_id, "name": param_name, "type": ptype,
                        "required": p.get("required", False)}
@@ -1140,8 +1142,8 @@ def publish_to_allegro(user: User, product_data: dict,
 
     resp = _post_offer(offer)
 
-    # Retry logic — strip individual bad parameters one at a time, up to 8 attempts
-    for _attempt in range(8):
+    # Retry logic — strip individual bad parameters one at a time, up to 20 attempts
+    for _attempt in range(20):
         if resp.status_code != 422:
             break
         try:
