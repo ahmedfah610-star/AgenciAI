@@ -271,38 +271,64 @@ def fetch_store_products(s: UserSettings, limit: int = 10) -> list[dict]:
 
 # ─── 2. IMAGE ANALYZER ────────────────────────────────────────────────────────
 
-def analyze_images(images: list[tuple[str, str]]) -> dict:
+def analyze_images(images: list[tuple[str, str]], topic: str = "") -> dict:
     content = []
     for image_b64, media_type in images:
         content.append({
             "type": "image",
             "source": {"type": "base64", "media_type": media_type, "data": image_b64},
         })
+
+    topic_hint = ""
+    if topic:
+        topic_hint = (
+            f'\n\nSeller hint: "{topic}". '
+            "If this contains a brand name, include it as \"Marka\". "
+            "Use this to better understand product context and category."
+        )
+
     content.append({
         "type": "text",
         "text": (
-            "You are an expert product analyst for an e-commerce store. "
-            "Analyze the provided product image(s) and respond ONLY with valid JSON (no markdown fences).\n\n"
+            "You are an expert product analyst for Polish Allegro e-commerce listings. "
+            "Analyze the product image(s) thoroughly. "
+            "Respond ONLY with valid JSON — no markdown fences, no preamble.\n\n"
+            "Detect ALL visible and inferable Allegro-relevant attributes. "
+            "These are used as search filters — be thorough and specific.\n\n"
             "JSON schema:\n"
             "{\n"
-            '  "description": "Detailed product description for copywriting: type, colors, material/texture, '
-            'shape, size estimate, style (modern/rustic/luxury/etc.), use case, notable features. '
-            'Factual only — no invented brand names or prices.",\n'
+            '  "description": "Factual product description: product type, colors, material/texture, '
+            'dimensions/size estimate, style, functions, use case, notable features, visible condition. '
+            'No invented brand names or prices unless clearly visible.",\n'
+            '  "suggested_topic": "1-3 word product topic hint, e.g. brand + type: Nike T-shirt, '
+            'Kubek ceramiczny, Lampa LED — in Polish if possible",\n'
             '  "features": {\n'
-            '    "Kolor": "dominant color(s)",\n'
-            '    "Materiał": "material or texture if visible",\n'
-            '    "Styl": "design style (e.g. minimalistyczny, rustykalny, luksusowy)",\n'
-            '    "Zastosowanie": "primary use case",\n'
-            '    "Stan": "new / used / vintage — if inferable",\n'
-            '    ... any other clearly visible attributes\n'
+            '    "Kolor": "dominant color(s) in Polish: Czarny / Biały / Czerwony / Niebieski / etc.",\n'
+            '    "Materiał": "material if visible: Bawełna / Skóra / Plastik / Drewno / Metal / etc.",\n'
+            '    "Stan": "Nowy — if packaged/unworn/sealed, Używany — if visibly worn/used",\n'
+            '    "Marka": "brand name ONLY if logo/text visible on product — omit otherwise",\n'
+            '    "Płeć": "Damski / Męski / Unisex — ONLY for clothing, shoes, accessories",\n'
+            '    "Rodzaj": "product subtype: T-shirt / Bluza / Kubek / Poduszka / Lampa / etc.",\n'
+            '    "Przeznaczenie": "primary use: Sport / Dom / Biuro / Dziecko / Outdoor / etc.",\n'
+            '    "Styl": "Sportowy / Klasyczny / Casual / Elegancki / Nowoczesny / Rustykalny / etc.",\n'
+            '    "Wzór": "Jednolity / W paski / W kratę / Nadruk / Kwiatowy — if applicable",\n'
+            '    "Rozmiar": "size or dimensions if estimable",\n'
+            '    "Wiek": "Dorosły / Dziecko / Niemowlę — if product targets specific age",\n'
+            '    "Funkcja": "key function(s): Dekoracyjna / Ochronna / Sportowa / Edukacyjna / etc."\n'
+            "    // add any other clearly visible product attribute\n"
             "  }\n"
             "}\n\n"
-            "Only include feature keys where you are confident. Skip uncertain ones."
+            "Rules:\n"
+            "- All feature VALUES must be in Polish\n"
+            "- Only include keys you are confident about — skip uncertain ones\n"
+            "- Stan must be exactly 'Nowy' or 'Używany' (no other values)\n"
+            "- Kolor: use simple Polish color names only"
+            + topic_hint
         ),
     })
     resp = anthropic_client.messages.create(
         model="claude-opus-4-5",
-        max_tokens=800,
+        max_tokens=1000,
         messages=[{"role": "user", "content": content}],
     )
     raw = resp.content[0].text.strip()
@@ -310,9 +336,9 @@ def analyze_images(images: list[tuple[str, str]]) -> dict:
     try:
         result = json.loads(raw)
         if "description" not in result:
-            result = {"description": raw, "features": {}}
+            result = {"description": raw, "features": {}, "suggested_topic": ""}
     except json.JSONDecodeError:
-        result = {"description": raw, "features": {}}
+        result = {"description": raw, "features": {}, "suggested_topic": ""}
     return result
 
 
@@ -778,7 +804,8 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
 def publish_to_allegro(user: User, product_data: dict,
                        image_urls: list[str] | None = None,
                        image_bytes_list: list[tuple[bytes, str]] | None = None,
-                       features: dict | None = None) -> dict:
+                       features: dict | None = None,
+                       topic: str = "") -> dict:
     s            = _ensure_settings(user)
     access_token = _get_valid_access_token(user)
     if not access_token:
@@ -804,8 +831,18 @@ def publish_to_allegro(user: User, product_data: dict,
         product_data.get("description") or f"<p>{product_data.get('short_description', '')}</p>"
     )
 
+    # Supplement features with brand from topic if not already present
+    merged_features = dict(features or {})
+    if topic and not merged_features.get("Marka"):
+        brand_candidate = " ".join(
+            w for w in topic.split()
+            if w and w[0].isupper() and len(w) > 1
+        )
+        if brand_candidate:
+            merged_features["Marka"] = brand_candidate
+
     # Fill parameters from detected features
-    parameters = _fill_allegro_parameters(access_token, category_id, features or {})
+    parameters = _fill_allegro_parameters(access_token, category_id, merged_features)
 
     offer: dict = {
         "name":       product_data["name"][:75],
@@ -900,17 +937,32 @@ def analyze():
                 store_products = fetch_store_products(s, limit=10)
             except Exception as e:
                 app.logger.warning("Could not fetch store products: %s", e)
-        vision_result  = analyze_images(images)
-        product_data   = generate_product(
+
+        vision_result   = analyze_images(images, topic=topic)
+        features        = dict(vision_result.get("features", {}))
+        suggested_topic = vision_result.get("suggested_topic", "")
+
+        # If user provided a topic and it contains a likely brand (capitalized word(s)),
+        # supplement features["Marka"] when AI didn't detect one from the image
+        if topic and not features.get("Marka"):
+            brand_candidate = " ".join(
+                w for w in topic.split()
+                if w and w[0].isupper() and len(w) > 1
+            )
+            if brand_candidate:
+                features["Marka"] = brand_candidate
+
+        product_data = generate_product(
             vision_result["description"],
             store_products,
-            vision_result.get("features", {}),
+            features,
             topic=topic,
         )
         return jsonify({
             "success":           True,
             "image_description": vision_result["description"],
-            "features":          vision_result.get("features", {}),
+            "features":          features,
+            "suggested_topic":   suggested_topic,
             "product":           product_data,
         })
     except Exception as e:
@@ -937,12 +989,13 @@ def publish():
     s      = _ensure_settings()
     result = {"success": True, "woocommerce": None, "allegro": None}
 
-    # Parse features from form (sent as JSON string)
+    # Parse features and topic from form
     features_raw = request.form.get("features", "{}")
     try:
         features = json.loads(features_raw) if features_raw else {}
     except Exception:
         features = {}
+    topic = (request.form.get("topic") or "").strip()
 
     # Read all image files into memory first (so we can use them for both WP and Allegro)
     raw_images: list[tuple[bytes, str, str]] = []  # (bytes, mime, filename_stem)
@@ -997,6 +1050,7 @@ def publish():
             image_urls=image_urls,
             image_bytes_list=image_bytes_list,
             features=features,
+            topic=topic,
         )
 
     wc_ok = result["woocommerce"] and result["woocommerce"].get("success")

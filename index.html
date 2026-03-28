@@ -966,6 +966,11 @@ analyzeBtn.addEventListener('click', async () => {
     if (!resp.ok || !data.success) throw new Error(data.error || 'Unknown error');
 
     currentFeatures = data.features || {};
+    // Suggest topic only if user left it empty
+    const topicInput = document.getElementById('topic-input');
+    if (!topicInput.value.trim() && data.suggested_topic) {
+      topicInput.value = data.suggested_topic;
+    }
     populateForm(data.product);
     document.getElementById('empty-state').style.display = 'none';
     document.getElementById('product-form').classList.add('visible');
@@ -1209,6 +1214,8 @@ document.getElementById('publish-btn').addEventListener('click', async () => {
   formData.append('product', JSON.stringify(product));
   formData.append('targets', JSON.stringify(targets));
   formData.append('features', JSON.stringify(currentFeatures));
+  const topicVal = document.getElementById('topic-input').value.trim();
+  if (topicVal) formData.append('topic', topicVal);
   currentFiles.forEach(f => formData.append('images', f));
 
   publishBtn.disabled = true;
