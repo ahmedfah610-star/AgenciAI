@@ -907,18 +907,32 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
         # /sale/product-offers handles routing to product vs offer automatically.
         user_val = _DIRECT_MAP.get(param_name, "")
         if user_val:
+            app.logger.info("Direct param [%s] type=%s dict_vals=%d user_val=%s",
+                            param_name, ptype, len(dict_vals), user_val)
             if ptype == "string":
                 direct_results.append({"id": param_id, "values": [user_val]})
                 direct_param_ids.add(param_id)
-                app.logger.info("Direct string param %s=%s → %s", param_name, user_val, param_id)
+                app.logger.info("→ string set: %s = %s", param_name, user_val)
                 continue
-            elif ptype == "dictionary" and dict_vals:
-                best_id = _fuzzy_match_value(user_val, dict_vals)
-                if best_id:
-                    direct_results.append({"id": param_id, "valuesIds": [best_id]})
-                    direct_param_ids.add(param_id)
-                    app.logger.info("Direct dict param %s=%s → valueId=%s", param_name, user_val, best_id)
-                    continue
+            elif ptype == "dictionary":
+                if dict_vals:
+                    best_id = _fuzzy_match_value(user_val, dict_vals)
+                    if best_id:
+                        direct_results.append({"id": param_id, "valuesIds": [best_id]})
+                        direct_param_ids.add(param_id)
+                        app.logger.info("→ dict matched: %s = valueId %s", param_name, best_id)
+                        continue
+                    else:
+                        app.logger.warning("→ dict NO MATCH for %s=%s in %d values (sample: %s)",
+                                           param_name, user_val, len(dict_vals),
+                                           [v["value"] for v in dict_vals[:5]])
+                else:
+                    app.logger.warning("→ dict EMPTY values for %s, trying string fallback", param_name)
+                # Fallback: send as open text value (works for open-dictionary params)
+                direct_results.append({"id": param_id, "values": [user_val]})
+                direct_param_ids.add(param_id)
+                app.logger.info("→ dict fallback to values[]: %s = %s", param_name, user_val)
+                continue
 
         # ── Everything else: only offer-scope params go to Claude ──
         offer_scope = (
