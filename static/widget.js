@@ -50,6 +50,7 @@
     }
     #cs-widget-btn:hover { transform: scale(1.08); box-shadow: 0 6px 24px rgba(0,0,0,0.3); }
     #cs-widget-btn svg { width: 28px; height: 28px; fill: white; }
+    #cs-widget-btn img { width: 44px !important; height: 44px !important; max-width: 44px !important; min-width: 44px !important; display: block !important; }
 
     #cs-widget {
       position: fixed; ${POSITION}: 24px; bottom: 24px;
