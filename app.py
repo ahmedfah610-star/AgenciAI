@@ -897,20 +897,14 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
     direct_param_ids: set[str] = set()
 
     for p in params_def:
-        offer_scope = (
-            p.get("offerScope")
-            or p.get("options", {}).get("offerScope")
-            or p.get("restrictions", {}).get("offerScope")
-        )
-        if offer_scope is False:
-            continue
-
-        param_id  = str(p["id"])
+        param_id   = str(p["id"])
         param_name = p.get("name", "")
         ptype      = p["type"]
         dict_vals  = p.get("dictionaryValues", [])
 
         # ── Direct handling for Marka, Rozmiar, Kolor, Stan ──
+        # NOTE: we include ALL params regardless of offerScope —
+        # /sale/product-offers handles routing to product vs offer automatically.
         user_val = _DIRECT_MAP.get(param_name, "")
         if user_val:
             if ptype == "string":
@@ -926,7 +920,15 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
                     app.logger.info("Direct dict param %s=%s → valueId=%s", param_name, user_val, best_id)
                     continue
 
-        # ── Everything else goes to Claude ──
+        # ── Everything else: only offer-scope params go to Claude ──
+        offer_scope = (
+            p.get("offerScope")
+            or p.get("options", {}).get("offerScope")
+            or p.get("restrictions", {}).get("offerScope")
+        )
+        if offer_scope is False:
+            continue  # skip non-priority product-scope params for Claude
+
         entry: dict = {"id": param_id, "name": param_name, "type": ptype,
                        "required": p.get("required", False)}
         if dict_vals:
@@ -1119,33 +1121,72 @@ def publish_to_allegro(user: User, product_data: dict,
 
     resp = _post_offer(offer)
 
-    # Retry logic for 422 errors — strip problematic fields one at a time
-    if resp.status_code == 422:
+    # Retry logic — strip individual bad parameters, then taxSettings, then all params
+    for _attempt in range(4):
+        if resp.status_code != 422:
+            break
         try:
             errs = resp.json().get("errors", [])
-            # Drop parameters on parameter errors
-            param_error = any(
-                e.get("path") == "parameters" or "parameter" in (e.get("code") or "").lower()
-                for e in errs
-            )
-            if param_error and offer.get("parameters"):
-                app.logger.warning("Parameter errors — dropping all parameters and retrying")
-                offer.pop("parameters", None)
-                resp = _post_offer(offer)
-                errs = resp.json().get("errors", []) if resp.status_code == 422 else []
+            if not errs:
+                break
 
-            # Drop taxSettings on tax-related errors
-            tax_error = any(
+            fixed = False
+
+            # 1. Remove specific bad parameter IDs reported in errors
+            bad_param_ids = set()
+            for e in errs:
+                path = e.get("path") or ""
+                # path like "parameters[2]" or "parameters[2].valuesIds[0]"
+                m = re.match(r"parameters\[(\d+)\]", path)
+                if m and offer.get("parameters"):
+                    idx = int(m.group(1))
+                    params = offer["parameters"]
+                    if idx < len(params):
+                        bad_id = params[idx].get("id")
+                        if bad_id:
+                            bad_param_ids.add(bad_id)
+                # Also catch ParameterCategoryException / similar by code
+                code = (e.get("code") or "").lower()
+                msg  = (e.get("userMessage") or e.get("message") or "")
+                # extract param id from userMessage like "Parameter `54:Rozmiar`..."
+                pm = re.search(r"Parameter `(\d+):", msg)
+                if pm:
+                    bad_param_ids.add(pm.group(1))
+
+            if bad_param_ids and offer.get("parameters"):
+                before = len(offer["parameters"])
+                offer["parameters"] = [p for p in offer["parameters"]
+                                        if p.get("id") not in bad_param_ids]
+                app.logger.warning("Removed bad params %s (%d→%d), retrying",
+                                   bad_param_ids, before, len(offer["parameters"]))
+                fixed = True
+
+            # 2. Generic parameter error — drop all remaining params
+            elif offer.get("parameters") and any(
+                "parameter" in (e.get("code") or "").lower() or
+                (e.get("path") or "").startswith("parameters")
+                for e in errs
+            ):
+                app.logger.warning("Generic parameter error — dropping all params and retrying")
+                offer.pop("parameters", None)
+                fixed = True
+
+            # 3. Tax error — drop taxSettings
+            elif offer.get("taxSettings") and any(
                 "tax" in (e.get("code") or "").lower() or
                 (e.get("path") or "").startswith("taxSettings")
                 for e in errs
-            )
-            if resp.status_code == 422 and tax_error and offer.get("taxSettings"):
-                app.logger.warning("Tax settings error — dropping taxSettings and retrying")
+            ):
+                app.logger.warning("Tax error — dropping taxSettings and retrying")
                 offer.pop("taxSettings", None)
-                resp = _post_offer(offer)
+                fixed = True
+
+            if not fixed:
+                break
+            resp = _post_offer(offer)
         except Exception as retry_err:
-            app.logger.warning("Retry failed: %s", retry_err)
+            app.logger.warning("Retry attempt failed: %s", retry_err)
+            break
 
     if resp.ok:
         data      = resp.json()
