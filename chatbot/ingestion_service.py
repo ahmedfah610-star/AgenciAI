@@ -137,46 +137,79 @@ def _process_text(source_id, tenant_id, text, metadata):
 
 # ── Ekstrakcja tekstu ────────────────────────────────────────
 
-def _scrape_url(url: str, max_pages: int = 20) -> str:
+def _normalize_url(href: str) -> str:
+    """Usuwa trailing slash i fragment żeby uniknąć duplikatów."""
+    return href.rstrip('/')
+
+
+def _scrape_url(url: str, max_pages: int = 10) -> str:
     """Scrapuje stronę główną + podstrony (max_pages)."""
     from urllib.parse import urljoin, urlparse
 
     base = urlparse(url)
     base_origin = f'{base.scheme}://{base.netloc}'
     visited = set()
-    queue = [url]
+    product_queue = []   # strony produktów — priorytet
+    other_queue = [_normalize_url(url)]
     all_texts = []
 
-    headers = {'User-Agent': 'AgenciAI-Bot/1.0 (knowledge ingestion)'}
+    headers = {'User-Agent': 'Mozilla/5.0 (compatible; AgenciAI-Bot/1.0)'}
 
-    while queue and len(visited) < max_pages:
-        current = queue.pop(0)
+    def next_url():
+        if product_queue:
+            return product_queue.pop(0)
+        if other_queue:
+            return other_queue.pop(0)
+        return None
+
+    while len(visited) < max_pages:
+        current = next_url()
+        if current is None:
+            break
         if current in visited:
             continue
         visited.add(current)
 
         try:
             resp = requests.get(current, timeout=15, headers=headers, allow_redirects=True)
-            if not resp.ok or 'text/html' not in resp.headers.get('Content-Type', ''):
+            if not resp.ok:
                 continue
+            ct = resp.headers.get('Content-Type', '')
+            if 'text/html' not in ct:
+                continue
+
             soup = BeautifulSoup(resp.text, 'html.parser')
 
             # Zbierz linki wewnętrzne
             for a in soup.find_all('a', href=True):
-                href = urljoin(current, a['href']).split('#')[0].split('?')[0]
-                if href.startswith(base_origin) and href not in visited:
-                    queue.append(href)
+                href = _normalize_url(
+                    urljoin(current, a['href']).split('#')[0].split('?')[0]
+                )
+                if not href.startswith(base_origin):
+                    continue
+                if href in visited:
+                    continue
+                # Produkty i ważne podstrony na przód kolejki
+                if any(seg in href for seg in ['/produkt', '/product', '/sklep', '/shop', '/kontakt', '/contact', '/cennik', '/dostawa']):
+                    if href not in product_queue:
+                        product_queue.append(href)
+                else:
+                    if href not in other_queue:
+                        other_queue.append(href)
 
             # Wyciągnij tekst
             for tag in soup(['script', 'style', 'nav', 'footer', 'header']):
                 tag.decompose()
-            title = soup.title.string.strip() if soup.title else ''
+            title = soup.title.string.strip() if soup.title else current
             body = soup.get_text(separator='\n', strip=True)
-            all_texts.append(f'=== {title or current} ===\n{body}')
+            all_texts.append(f'=== {title} ===\nURL: {current}\n{body}')
+            print(f'[Crawler] {len(visited)}/{max_pages} — {current}')
 
-        except Exception:
+        except Exception as e:
+            print(f'[Crawler] Błąd {current}: {e}')
             continue
 
+    print(f'[Crawler] Zakończono — przeskanowano {len(visited)} stron')
     return '\n\n'.join(all_texts)
 
 
