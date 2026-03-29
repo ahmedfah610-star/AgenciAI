@@ -1400,6 +1400,12 @@ def publish():
     return jsonify(result)
 
 
+@app.errorhandler(500)
+def internal_error(e):
+    app.logger.exception("Internal 500 error")
+    return jsonify({"error": f"Server error: {e}"}), 500
+
+
 # ─── ALLEGRO SUGGEST OPTIONS ──────────────────────────────────────────────────
 
 # VAT parameter names used by Allegro in category parameters
