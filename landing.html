@@ -39,12 +39,19 @@ body {
 nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 100;
   height: 52px;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 22px;
   background: rgba(255,255,255,0.85);
   backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+.nav-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 22px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .logo {
@@ -542,8 +549,8 @@ h2 {
 footer {
   background: var(--bg2);
   border-top: 1px solid var(--border-light);
-  padding: 36px 48px;
-  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;
+  padding: 56px 24px;
+  display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 24px; text-align: center;
 }
 footer .logo { font-size: 17px; }
 footer p { font-size: 13px; color: var(--text3); }
@@ -571,16 +578,18 @@ footer a:hover { color: var(--text); }
 <body>
 
 <nav>
-  <a href="#" class="logo"><img src="/static/logo.png" style="height:28px; width:auto; margin-right:8px; vertical-align:middle; border-radius:6px" alt="logo">biz<span>Agent</span></a>
-  <ul>
-    <li><a href="#agenci">Agenci</a></li>
-    <li><a href="#jak-dziala">Jak działa</a></li>
-    <li><a href="#cennik">Cennik</a></li>
-    <li><a href="#faq">FAQ</a></li>
-  </ul>
-  <div class="nav-right">
-    <a href="/login" class="nav-login">Zaloguj się</a>
-    <a href="#zamow" class="nav-cta">Zamów agenta</a>
+  <div class="nav-inner">
+    <a href="#" class="logo"><img src="/static/logo.png" style="height:28px; width:auto; margin-right:8px; vertical-align:middle; border-radius:6px" alt="logo">biz<span>Agent</span></a>
+    <ul>
+      <li><a href="#agenci">Agenci</a></li>
+      <li><a href="#jak-dziala">Jak działa</a></li>
+      <li><a href="#cennik">Cennik</a></li>
+      <li><a href="#faq">FAQ</a></li>
+    </ul>
+    <div class="nav-right">
+      <a href="/login" class="nav-login">Zaloguj się</a>
+      <a href="#zamow" class="nav-cta">Zamów agenta</a>
+    </div>
   </div>
 </nav>
 
