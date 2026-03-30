@@ -18,8 +18,8 @@
   --text3: #a1a1a6;
   --accent: #0071e3;
   --accent-hover: #0077ed;
-  --purple: #af52de;
-  --purple-hover: #9b3dc8;
+  
+  
   --green: #34c759;
   --red: #ff3b30;
   --orange: #ff9500;
@@ -50,7 +50,7 @@ nav {
   border-bottom: 1px solid rgba(0,0,0,0.08);
 }
 .logo { font-size: 19px; font-weight: 600; color: var(--text); text-decoration: none; letter-spacing: -0.3px; }
-.logo span { color: var(--purple); }
+.logo span { color: var(--accent); }
 .nav-right { display: flex; align-items: center; gap: 12px; }
 .nav-link { font-size: 13px; color: var(--text2); text-decoration: none; transition: color .15s; }
 .nav-link:hover { color: var(--text); }
@@ -75,7 +75,7 @@ nav {
 }
 .page-header h1 em {
   font-style: normal;
-  background: linear-gradient(90deg, var(--purple), #ff6b9d);
+  background: linear-gradient(90deg, var(--accent), #ff6b9d);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -118,8 +118,8 @@ nav {
   background: var(--bg3);
 }
 .upload-zone:hover, .upload-zone.dragover {
-  border-color: var(--purple);
-  background: rgba(175,82,222,0.03);
+  border-color: var(--accent);
+  background: rgba(0,113,227,0.03);
 }
 .upload-zone.has-file {
   border-style: solid;
@@ -201,7 +201,7 @@ nav {
   outline: none;
   transition: border-color .15s;
 }
-.topic-row input:focus { border-color: var(--purple); }
+.topic-row input:focus { border-color: var(--accent); }
 
 /* AI BUTTON */
 .ai-btn {
@@ -210,7 +210,7 @@ nav {
   gap: 8px;
   margin-top: 16px;
   padding: 10px 20px;
-  background: linear-gradient(135deg, var(--purple), #e040fb);
+  background: linear-gradient(135deg, var(--accent), #00c6ff);
   color: #fff;
   border: none;
   border-radius: 10px;
@@ -220,7 +220,7 @@ nav {
   font-family: var(--font);
   transition: all .2s;
 }
-.ai-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(175,82,222,0.35); }
+.ai-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,113,227,0.35); }
 .ai-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
 
 /* CAPTION AREA */
@@ -244,7 +244,7 @@ nav {
   line-height: 1.6;
   transition: border-color .15s;
 }
-.caption-textarea:focus { border-color: var(--purple); }
+.caption-textarea:focus { border-color: var(--accent); }
 
 .char-count {
   text-align: right;
@@ -273,8 +273,8 @@ nav {
   align-items: center;
   gap: 4px;
   padding: 4px 12px;
-  background: rgba(175,82,222,0.08);
-  color: var(--purple);
+  background: rgba(0,113,227,0.08);
+  color: var(--accent);
   border-radius: 100px;
   font-size: 13px;
   font-weight: 500;
@@ -282,7 +282,7 @@ nav {
 .hashtag-remove {
   background: none;
   border: none;
-  color: var(--purple);
+  color: var(--accent);
   cursor: pointer;
   font-size: 14px;
   padding: 0 2px;
@@ -342,8 +342,8 @@ nav {
   position: relative;
 }
 .platform-card.selected {
-  border-color: var(--purple);
-  background: rgba(175,82,222,0.03);
+  border-color: var(--accent);
+  background: rgba(0,113,227,0.03);
 }
 .platform-card.disabled {
   opacity: .45;
@@ -382,8 +382,8 @@ nav {
   transition: all .15s;
 }
 .platform-card.selected .platform-check {
-  background: var(--purple);
-  border-color: var(--purple);
+  background: var(--accent);
+  border-color: var(--accent);
   color: #fff;
 }
 
@@ -423,7 +423,7 @@ nav {
 .publish-btn {
   width: 100%;
   padding: 16px;
-  background: linear-gradient(135deg, var(--purple), #e040fb);
+  background: linear-gradient(135deg, var(--accent), #00c6ff);
   color: #fff;
   border: none;
   border-radius: 14px;
@@ -436,7 +436,7 @@ nav {
 }
 .publish-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(175,82,222,0.4);
+  box-shadow: 0 6px 24px rgba(0,113,227,0.4);
 }
 .publish-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
 
@@ -470,7 +470,7 @@ nav {
   display: none;
   transition: all .3s;
 }
-.status-bar.loading { display: block; background: rgba(175,82,222,0.1); color: var(--purple); }
+.status-bar.loading { display: block; background: rgba(0,113,227,0.1); color: var(--accent); }
 .status-bar.success { display: block; background: rgba(52,199,89,0.1); color: var(--green); }
 .status-bar.error { display: block; background: rgba(255,59,48,0.1); color: var(--red); }
 

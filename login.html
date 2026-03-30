@@ -3,87 +3,146 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WooAI — Logowanie</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<title>bizAgent — Logowanie</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  
   :root {
-    --bg: #0f0f11; --surface: #17171a; --border: rgba(255,255,255,0.07);
-    --text: #e8e8ec; --muted: #7c7c8a; --accent: #7c6af7; --accent2: #5e4fd6;
-    --green: #34d399; --red: #f87171;
+    --bg: #fbfbfd;
+    --surface: #ffffff;
+    --border: #d2d2d7;
+    --text: #1d1d1f;
+    --muted: #6e6e73;
+    --accent: #0071e3;
+    --accent-hover: #0077ed;
+    --green: #34c759;
+    --red: #ff3b30;
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+
   body {
-    font-family: 'DM Sans', system-ui, sans-serif;
-    background: var(--bg); color: var(--text);
-    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 15px;
+    -webkit-font-smoothing: antialiased;
   }
+
   .card {
-    width: 100%; max-width: 420px; padding: 48px 40px;
-    background: var(--surface); border: 1px solid var(--border);
+    width: 100%;
+    max-width: 420px;
+    padding: 48px 40px;
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.04);
   }
-  .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; }
-  .logo-mark {
-    width: 36px; height: 36px;
-    background: linear-gradient(135deg, var(--accent), #b06ef3);
-    border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px;
-  }
-  .logo-text { font-family: 'DM Serif Display', serif; font-size: 22px; }
-  .logo-text span { color: var(--accent); font-style: italic; }
 
-  .tabs { display: flex; gap: 0; margin-bottom: 28px; border-bottom: 1px solid var(--border); }
+  .logo { 
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    gap: 8px; 
+    margin-bottom: 32px; 
+    text-decoration: none;
+  }
+  .logo-text { font-size: 24px; font-weight: 600; color: var(--text); letter-spacing: -0.5px; }
+  .logo-text span { color: var(--accent); }
+
+  .tabs { 
+    display: flex; 
+    gap: 0; 
+    margin-bottom: 28px; 
+    border-bottom: 1px solid var(--border); 
+  }
   .tab {
-    flex: 1; padding: 10px; text-align: center; font-size: 14px; font-weight: 500;
-    color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent;
+    flex: 1; 
+    padding: 12px; 
+    text-align: center; 
+    font-size: 15px; 
+    font-weight: 500;
+    color: var(--muted); 
+    cursor: pointer; 
+    border-bottom: 2px solid transparent;
     transition: all .2s;
+    margin-bottom: -1px;
   }
-  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tab:hover:not(.active) { color: var(--text); }
 
-  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; margin-top: 16px; }
+  label { display: block; font-size: 13px; font-weight: 500; color: var(--muted); margin-bottom: 8px; margin-top: 20px; }
+  
   input[type=email], input[type=password] {
-    width: 100%; padding: 11px 14px; background: #0f0f11;
-    border: 1px solid var(--border); border-radius: 10px;
-    color: var(--text); font-size: 14px; font-family: inherit;
-    transition: border-color .2s;
+    width: 100%; 
+    padding: 12px 16px; 
+    background: var(--bg);
+    border: 1.5px solid var(--border); 
+    border-radius: 10px;
+    color: var(--text); 
+    font-size: 15px; 
+    font-family: inherit;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
   }
-  input:focus { outline: none; border-color: var(--accent); }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,113,227,0.1); }
+  
   .btn {
-    width: 100%; margin-top: 24px; padding: 12px;
-    background: var(--accent); color: #fff; border: none; border-radius: 10px;
-    font-size: 15px; font-weight: 500; cursor: pointer; font-family: inherit;
-    transition: background .2s;
+    width: 100%; 
+    margin-top: 32px; 
+    padding: 14px;
+    background: var(--accent); 
+    color: #fff; 
+    border: none; 
+    border-radius: 12px;
+    font-size: 16px; 
+    font-weight: 500; 
+    cursor: pointer; 
+    font-family: inherit;
+    transition: background .15s, transform .15s;
+    letter-spacing: -0.2px;
   }
-  .btn:hover { background: var(--accent2); }
-  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn:hover { background: var(--accent-hover); transform: scale(1.02); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+  
   .error {
-    margin-top: 16px; padding: 10px 14px; background: rgba(248,113,113,.1);
-    border: 1px solid rgba(248,113,113,.2); border-radius: 8px;
-    color: var(--red); font-size: 13px; display: none;
+    margin-top: 16px; padding: 12px 16px; background: rgba(255,59,48,.1);
+    border: 1px solid rgba(255,59,48,.2); border-radius: 10px;
+    color: var(--red); font-size: 14px; display: none; text-align: center;
   }
   .success {
-    margin-top: 16px; padding: 10px 14px; background: rgba(52,211,153,.1);
-    border: 1px solid rgba(52,211,153,.2); border-radius: 8px;
-    color: var(--green); font-size: 13px; display: none;
+    margin-top: 16px; padding: 12px 16px; background: rgba(52,199,89,.1);
+    border: 1px solid rgba(52,199,89,.2); border-radius: 10px;
+    color: var(--green); font-size: 14px; display: none; text-align: center;
+  }
+
+  .password-hint {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 400;
   }
 </style>
 </head>
 <body>
 <div class="card">
-  <div class="logo">
-    <div class="logo-mark">✦</div>
-    <div class="logo-text">Woo<span>AI</span></div>
-  </div>
+  <a href="/" class="logo">
+    <div class="logo-text">biz<span>Agent</span></div>
+  </a>
 
   <div class="tabs">
-    <div class="tab active" id="tab-login" onclick="switchTab('login')">Logowanie</div>
-    <div class="tab" id="tab-register" onclick="switchTab('register')">Rejestracja</div>
+    <div class="tab active" id="tab-login" onclick="switchTab('login')">Zaloguj się</div>
+    <div class="tab" id="tab-register" onclick="switchTab('register')">Nowe konto</div>
   </div>
 
   <!-- Login form -->
   <div id="form-login">
-    <label>E-mail</label>
-    <input type="email" id="login-email" placeholder="ty@firma.pl" autocomplete="email">
+    <label>Twój e-mail</label>
+    <input type="email" id="login-email" placeholder="jan@firma.pl" autocomplete="email">
     <label>Hasło</label>
     <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
     <button class="btn" onclick="doLogin()">Zaloguj się</button>
@@ -92,9 +151,9 @@
 
   <!-- Register form -->
   <div id="form-register" style="display:none">
-    <label>E-mail</label>
-    <input type="email" id="reg-email" placeholder="ty@firma.pl" autocomplete="email">
-    <label>Hasło <span style="color:var(--muted);font-size:11px">(min. 6 znaków)</span></label>
+    <label>Twój e-mail</label>
+    <input type="email" id="reg-email" placeholder="jan@firma.pl" autocomplete="email">
+    <label>Hasło <span class="password-hint">(min. 6 znaków)</span></label>
     <input type="password" id="reg-password" placeholder="••••••••" autocomplete="new-password">
     <button class="btn" onclick="doRegister()">Załóż konto</button>
     <div class="error" id="reg-error"></div>

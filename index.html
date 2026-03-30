@@ -3,19 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WooAI — Product Agent</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<title>bizAgent — Agent Sprzedaży</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f5f6fa;
+    --bg: #fbfbfd;
     --surface: #ffffff;
-    --surface2: #eef0f6;
+    --surface2: #f5f5f7;
     --border: rgba(0,0,0,0.08);
     --border2: rgba(0,0,0,0.12);
     --text: #111827;
     --muted: #6b7280;
-    --accent: #7c6af7;
-    --accent2: #5e4fd6;
+    --accent: #0071e3;
+    --accent2: #0077ed;
     --green: #059669;
     --green-dim: rgba(5,150,105,0.08);
     --red: #dc2626;
@@ -23,7 +24,7 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: 'DM Sans', system-ui, sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
@@ -41,15 +42,8 @@
     gap: 14px;
     background: var(--surface);
   }
-  .logo-mark {
-    width: 34px; height: 34px;
-    background: linear-gradient(135deg, var(--accent), #b06ef3);
-    border-radius: 9px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 16px;
-  }
-  .logo-text { font-family: 'DM Serif Display', serif; font-size: 20px; letter-spacing: -0.3px; }
-  .logo-text span { color: var(--accent); font-style: italic; }
+  .logo { font-size: 19px; font-weight: 600; color: var(--text); text-decoration: none; letter-spacing: -0.3px; }
+  .logo span { color: var(--accent); }
   .header-badge {
     margin-left: auto;
     font-size: 11px;
@@ -103,7 +97,7 @@
   }
   .upload-zone:hover, .upload-zone.drag-over {
     border-color: var(--accent);
-    background: rgba(124,106,247,0.05);
+    background: rgba(0,113,227,0.05);
   }
   .upload-zone input[type=file] {
     position: absolute; inset: 0;
@@ -170,7 +164,7 @@
     cursor: pointer; color: var(--muted); font-size: 28px;
     transition: all .15s; position: relative; overflow: hidden;
   }
-  .add-more-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(124,106,247,0.05); }
+  .add-more-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,113,227,0.05); }
   .add-more-btn input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
   .image-count {
     font-size: 12px;
@@ -222,12 +216,12 @@
     align-items: center;
     gap: 10px;
   }
-  .status-bar.loading { display: flex; background: rgba(124,106,247,0.08); border: 1px solid rgba(124,106,247,0.2); color: var(--accent2); }
+  .status-bar.loading { display: flex; background: rgba(0,113,227,0.08); border: 1px solid rgba(0,113,227,0.2); color: var(--accent2); }
   .status-bar.error   { display: flex; background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.2); color: var(--red); }
   .status-bar.success { display: flex; background: var(--green-dim); border: 1px solid rgba(52,211,153,0.2); color: var(--green); }
   .spinner {
     width: 16px; height: 16px;
-    border: 2px solid rgba(124,106,247,0.3);
+    border: 2px solid rgba(0,113,227,0.3);
     border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
@@ -255,7 +249,7 @@
   }
   input[type=text]:focus, input[type=number]:focus, textarea:focus, select:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(124,106,247,0.12);
+    box-shadow: 0 0 0 3px rgba(0,113,227,0.12);
   }
   textarea { min-height: 90px; }
 
@@ -274,10 +268,10 @@
     cursor: text;
     align-items: center;
   }
-  .tags-input:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,106,247,0.12); }
+  .tags-input:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,113,227,0.12); }
   .tag-pill {
-    background: rgba(124,106,247,0.1);
-    border: 1px solid rgba(124,106,247,0.25);
+    background: rgba(0,113,227,0.1);
+    border: 1px solid rgba(0,113,227,0.25);
     color: var(--accent2);
     font-size: 12px;
     padding: 2px 8px 2px 10px;
@@ -310,7 +304,7 @@
     content: '';
     flex: 1;
     height: 1px;
-    background: rgba(124,106,247,0.2);
+    background: rgba(0,113,227,0.2);
   }
 
   /* ─── Features chips ─── */
@@ -437,7 +431,7 @@
     background: var(--surface); border: 1px solid var(--border2); border-radius: 20px;
     padding: 36px; width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto;
   }
-  .modal h2 { font-family: 'DM Serif Display', serif; font-size: 20px; margin-bottom: 24px; }
+  .modal h2 { font-family: 'Inter', serif; font-size: 20px; margin-bottom: 24px; }
   details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-top: 16px; user-select: none; }
   details summary:hover { color: var(--text); }
   details[open] summary { color: var(--accent); }
@@ -499,7 +493,7 @@
   .target-toggle.active {
     border-color: var(--accent);
     color: var(--text);
-    background: rgba(124,106,247,0.1);
+    background: rgba(0,113,227,0.1);
   }
   .target-toggle input { display: none; }
 
@@ -635,9 +629,8 @@
 <body>
 <div class="shell">
   <header>
-    <div class="logo-mark">✦</div>
-    <span class="logo-text">Woo<span>AI</span></span>
-    <span style="color:var(--muted);font-size:13px;margin-left:4px">Product Agent</span>
+    <a href="/dashboard" class="logo">biz<span>Agent</span></a>
+    <span style="color:var(--muted);font-size:13px;margin-left:4px">Agent Sprzedaży</span>
     <div class="header-user">
       <span id="header-email" style="font-size:12px;color:var(--muted)"></span>
       <a href="/chatbot/dashboard" class="btn-header" style="text-decoration:none">🤖 ChatBot</a>
@@ -653,7 +646,7 @@
 
       <div class="modal-section">Sklep WordPress / WooCommerce</div>
 
-      <div style="background:rgba(124,106,247,0.08);border:1px solid rgba(124,106,247,0.2);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--accent2);margin-bottom:4px;line-height:1.6;">
+      <div style="background:rgba(0,113,227,0.08);border:1px solid rgba(0,113,227,0.2);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--accent2);margin-bottom:4px;line-height:1.6;">
         🔑 <b>Jak wygenerować hasło aplikacji:</b><br>
         WP Admin → Użytkownicy → Twój profil → przewiń na dół →<br>
         <b>Hasła aplikacji</b> → wpisz nazwę „WooAI" → kliknij Dodaj → skopiuj hasło

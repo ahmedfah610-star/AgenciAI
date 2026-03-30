@@ -88,10 +88,45 @@ nav {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   text-align: center;
-  padding: 100px 24px 80px;
+  padding: 120px 24px 100px;
   background: linear-gradient(180deg, #fbfbfd 0%, #ffffff 100%);
+}
+
+.section-divider {
+  width: 100%;
+  max-width: 820px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-light), transparent);
+  margin: 60px 0 50px;
+}
+
+.upsell-header {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  color: var(--text);
+  margin-bottom: 8px;
+  animation: fadeUp 0.5s 0.3s ease both;
+}
+
+.upsell-sub {
+  font-size: 15px;
+  color: var(--text2);
+  margin-bottom: 32px;
+  animation: fadeUp 0.5s 0.35s ease both;
+}
+
+.tool-card.upsell {
+  border: 1.5px dashed var(--border-light);
+  background: var(--bg2);
+}
+.tool-card.upsell:hover {
+  border-color: var(--border);
+  background: var(--bg);
+}
+.tool-card.upsell .tool-cta {
+  color: var(--accent);
 }
 
 .hero-eyebrow {
@@ -380,6 +415,92 @@ footer a:hover { color: var(--text); }
       </div>
       <div class="tool-cta">
         Otwórz narzędzie <span class="tool-cta-arrow">→</span>
+      </div>
+    </a>
+
+  </div>
+
+  <div class="section-divider"></div>
+
+  <div class="upsell-header">Wdrożymy w ciągu 24-48H</div>
+  <p class="upsell-sub">Zamów dedykowanego Agenta AI i oddeleguj mu kolejne zadania w firmie.</p>
+
+  <div class="tools-grid">
+
+    <!-- Mail Agent -->
+    <a href="/#zamow" class="tool-card upsell">
+      <div class="tool-icon" style="background: linear-gradient(135deg, #f0f0f5, #e8e8ed);">✉️</div>
+      <div class="tool-name">
+        Mail Agent
+        <span class="tool-badge badge-soon">Na zamówienie</span>
+      </div>
+      <div class="tool-desc">
+        Czyta, analizuje i odpowiada na maile klientów automatycznie — w imieniu Twojej firmy, całą dobę. Eskaluje trudne sprawy do Ciebie.
+      </div>
+      <div class="tool-tags">
+        <span class="tool-tag">Gmail</span>
+        <span class="tool-tag">Outlook</span>
+        <span class="tool-tag">Auto-odpowiedzi</span>
+      </div>
+      <div class="tool-cta">
+        Zamów wdrożenie <span class="tool-cta-arrow">→</span>
+      </div>
+    </a>
+
+    <!-- Support Agent -->
+    <a href="/#zamow" class="tool-card upsell">
+      <div class="tool-icon" style="background: linear-gradient(135deg, #f0f0f5, #e8e8ed);">💬</div>
+      <div class="tool-name">
+        Support Agent
+        <span class="tool-badge badge-soon">Na zamówienie</span>
+      </div>
+      <div class="tool-desc">
+        Chatbot AI na Twojej stronie. Odpowiada na pytania 24/7 na bazie bazy wiedzy o Twoich produktach.
+      </div>
+      <div class="tool-tags">
+        <span class="tool-tag">Widget WWW</span>
+        <span class="tool-tag">Baza wiedzy</span>
+      </div>
+      <div class="tool-cta">
+        Zamów wdrożenie <span class="tool-cta-arrow">→</span>
+      </div>
+    </a>
+
+    <!-- Competitor Intel -->
+    <a href="/#zamow" class="tool-card upsell">
+      <div class="tool-icon" style="background: linear-gradient(135deg, #f0f0f5, #e8e8ed);">🔍</div>
+      <div class="tool-name">
+        Competitor Intel
+        <span class="tool-badge badge-soon">Na zamówienie</span>
+      </div>
+      <div class="tool-desc">
+        Codziennie monitoruje ceny i oferty konkurencji. Wysyła wnioski kiedy obniżyć lub podnieść cenę by zdominować rynek.
+      </div>
+      <div class="tool-tags">
+        <span class="tool-tag">Scraping</span>
+        <span class="tool-tag">Monitoring Cen</span>
+      </div>
+      <div class="tool-cta">
+        Zamów wdrożenie <span class="tool-cta-arrow">→</span>
+      </div>
+    </a>
+
+    <!-- SEO Report Agent -->
+    <a href="/#zamow" class="tool-card upsell">
+      <div class="tool-icon" style="background: linear-gradient(135deg, #f0f0f5, #e8e8ed);">📊</div>
+      <div class="tool-name">
+        SEO Report Agent
+        <span class="tool-badge badge-soon">Na zamówienie</span>
+      </div>
+      <div class="tool-desc">
+        Automatycznie analizuje frazy Google i generuje idealnie zoptymalizowane teksty na Twojego bloga firmowego uderzające w niszę.
+      </div>
+      <div class="tool-tags">
+        <span class="tool-tag">Google Pozycjonowanie</span>
+        <span class="tool-tag">Ghostwriting</span>
+      </div>
+      <div class="tool-cta">
+        Zamów wdrożenie <span class="tool-cta-arrow">→</span>
       </div>
     </a>
 
