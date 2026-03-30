@@ -397,6 +397,11 @@ def meta_disconnect():
 #  TIKTOK OAUTH
 # ═══════════════════════════════════════════════════════════════════════════════
 
+@social_bp.route("/api/social/tiktok/auth/callback/tiktok5ONvBuql5QIJeGDGK7OCyNgziO0LCC6W.txt")
+def verify_tiktok_domain():
+    return "tiktok-developers-site-verification=5ONvBuql5QIJeGDGK7OCyNgziO0LCC6W", 200, {'Content-Type': 'text/plain'}
+
+
 @social_bp.route("/api/social/tiktok/auth/start")
 @login_required
 def tiktok_auth_start():
