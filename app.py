@@ -1670,13 +1670,11 @@ def test_wc():
         return jsonify({"success": False, "error": str(e)})
 
 
-# ─── Static / Index & Verifications ─────────────────────────────────────────────
-
-@app.route("/tiktokupJBXz7ikLxRMfqGzI0WOWP3WrS6gaRh.txt")
-@app.route("/privacy/tiktokupJBXz7ikLxRMfqGzI0WOWP3WrS6gaRh.txt")
-@app.route("/terms/tiktokupJBXz7ikLxRMfqGzI0WOWP3WrS6gaRh.txt")
-def verify_tiktok_privacy():
-    return "tiktok-developers-site-verification=upJBXz7ikLxRMfqGzI0WOWP3WrS6gaRh", 200, {'Content-Type': 'text/plain'}
+@app.route("/tiktok<codestr>.txt")
+@app.route("/privacy/tiktok<codestr>.txt")
+@app.route("/terms/tiktok<codestr>.txt")
+def verify_tiktok_dynamic(codestr):
+    return f"tiktok-developers-site-verification={codestr}", 200, {'Content-Type': 'text/plain'}
 
 @app.route("/")
 def landing():
