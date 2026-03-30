@@ -880,12 +880,12 @@ function submitForm() {
 fetch('/auth/me').then(r => {
   if (r.ok) {
      document.querySelectorAll('.nav-login').forEach(el => {
-       el.textContent = 'Przejdź do aplikacji';
-       el.href = '/app';
+       el.textContent = 'Przejdź do panelu';
+       el.href = '/dashboard';
      });
      document.querySelectorAll('a[href="/login"]').forEach(el => {
-       el.textContent = 'Panel sprzedawcy';
-       el.href = '/app';
+       el.textContent = 'Panel';
+       el.href = '/dashboard';
      });
   }
 }).catch(() => {});

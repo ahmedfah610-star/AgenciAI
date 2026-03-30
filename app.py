@@ -162,7 +162,7 @@ def _check_pw(pw: str, hashed: str) -> bool:
 @app.route("/login")
 def login_page():
     if current_user.is_authenticated:
-        return redirect("/app")
+        return redirect("/dashboard")
     return send_from_directory(os.path.dirname(os.path.abspath(__file__)), "login.html")
 
 
@@ -1660,6 +1660,11 @@ def test_wc():
 @app.route("/")
 def landing():
     return send_from_directory(os.path.dirname(os.path.abspath(__file__)), "landing.html")
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), "dashboard.html")
 
 @app.route("/app")
 @login_required
