@@ -876,6 +876,20 @@ function submitForm() {
   document.getElementById('form-fields').style.display = 'none';
   document.getElementById('form-success').style.display = 'block';
 }
+
+fetch('/auth/me').then(r => {
+  if (r.ok) {
+     document.querySelectorAll('.nav-login').forEach(el => {
+       el.textContent = 'Przejdź do aplikacji';
+       el.href = '/app';
+     });
+     document.querySelectorAll('a[href="/login"]').forEach(el => {
+       el.textContent = 'Panel sprzedawcy';
+       el.href = '/app';
+     });
+  }
+}).catch(() => {});
+
 </script>
 </body>
 </html>

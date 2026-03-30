@@ -1532,7 +1532,11 @@ document.getElementById('publish-btn').addEventListener('click', async () => {
 
     let data;
     try { data = await resp.json(); }
-    catch { throw new Error(`Serwer zwrócił błąd ${resp.status} — sprawdź terminal`); }
+    catch { throw new Error(`Serwer zwrócił rzut błędu ${resp.status} — sprawdź terminal`); }
+    
+    if (!resp.ok && data.error) {
+      throw new Error(data.error);
+    }
 
     // Images info
     const imgInfo = document.getElementById('publish-images-info');

@@ -162,7 +162,7 @@ def _check_pw(pw: str, hashed: str) -> bool:
 @app.route("/login")
 def login_page():
     if current_user.is_authenticated:
-        return redirect("/")
+        return redirect("/app")
     return send_from_directory(os.path.dirname(os.path.abspath(__file__)), "login.html")
 
 
@@ -858,12 +858,19 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
 
     # ── Key feature names that map to Allegro parameter names ──
     # Polish param name → feature key
-    _DIRECT_MAP = {
-        "Marka":   merged_features.get("Marka", ""),
-        "Rozmiar": merged_features.get("Rozmiar", ""),
-        "Kolor":   merged_features.get("Kolor", ""),
-        "Stan":    merged_features.get("Stan", ""),
-    }
+    def _get_user_val(p_name: str) -> str:
+        p_lower = p_name.lower()
+        val = ""
+        if "marka" in p_lower or "producent" in p_lower:
+            val = merged_features.get("Marka", "")
+        elif "rozmiar" in p_lower:
+            val = merged_features.get("Rozmiar", "")
+        elif "kolor" in p_lower:
+            val = merged_features.get("Kolor", "")
+        elif "stan" in p_lower and "opakowani" not in p_lower:
+            val = merged_features.get("Stan", "")
+            
+        return str(val).strip() if val else ""
 
     def _fuzzy_match_value(user_val: str, dict_values: list) -> str | None:
         """Find best matching valueId from dictionaryValues for user_val (case-insensitive)."""
@@ -909,12 +916,32 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
         """Build a parameter dict from user value."""
         if ptype == "string":
             return {"id": param_id, "values": [user_val]}
-        elif ptype == "dictionary" and dict_vals:
+        elif ptype == "dictionary" and dict_vals is not None:
             best_id = _fuzzy_match_value(user_val, dict_vals)
+            if not best_id:
+                try:
+                    r = requests.get(
+                        f"{ALLEGRO_API_BASE}/sale/categories/{category_id}/parameters/{param_id}/dictionary",
+                        headers=headers, timeout=5
+                    )
+                    if r.ok:
+                        full_dict = r.json().get("dictionary", [])
+                        best_id = _fuzzy_match_value(user_val, full_dict)
+                        if not best_id:
+                            for v in full_dict:
+                                if v.get("value", "").lower() in ["inna", "inny", "inne"]:
+                                    best_id = v["id"]
+                                    break
+                except Exception as e:
+                    app.logger.warning("Dict fetch err: %s", e)
+
             if best_id:
                 return {"id": param_id, "valuesIds": [best_id]}
+        
         # fallback — open text
         return {"id": param_id, "values": [user_val]}
+
+    direct_param_ids = set()
 
     for p in params_def:
         param_id   = str(p["id"])
@@ -924,10 +951,11 @@ def _fill_allegro_parameters(access_token: str, category_id: str,
         scope      = _get_scope(p)
         is_product_scope = (scope is False)
 
-        user_val = _DIRECT_MAP.get(param_name, "")
+        user_val = _get_user_val(param_name)
 
         if user_val:
             entry = _build_param_entry(param_id, user_val, ptype, dict_vals)
+            direct_param_ids.add(param_id)
             if is_product_scope:
                 product_params.append(entry)
                 app.logger.info("Product param: %s=%s → %s", param_name, user_val, entry)
@@ -1402,8 +1430,10 @@ def publish():
 
 @app.errorhandler(500)
 def internal_error(e):
-    app.logger.exception("Internal 500 error")
-    return jsonify({"error": f"Server error: {e}"}), 500
+    import traceback
+    tb = traceback.format_exc()
+    app.logger.error("Internal 500 error:\n%s", tb)
+    return jsonify({"error": f"Błąd serwera (zgłoś to do twórcy):\n{tb}"}), 500
 
 
 # ─── ALLEGRO SUGGEST OPTIONS ──────────────────────────────────────────────────
