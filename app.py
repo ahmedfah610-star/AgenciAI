@@ -1676,6 +1676,14 @@ def test_wc():
 def landing():
     return send_from_directory(os.path.dirname(os.path.abspath(__file__)), "landing.html")
 
+@app.route("/privacy")
+def privacy_page():
+    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), "privacy.html")
+
+@app.route("/terms")
+def terms_page():
+    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), "terms.html")
+
 @app.route("/dashboard")
 @login_required
 def dashboard():
