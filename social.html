@@ -526,7 +526,7 @@ nav {
   </div>
 
   <!-- ═══ CAPTION ═══ -->
-  <div class="card caption-area" id="caption-card">
+  <div class="card caption-area visible" id="caption-card">
     <div class="card-title">✏️ Opis posta</div>
     <textarea class="caption-textarea" id="caption-text" placeholder="Twój opis pojawi się tutaj..."></textarea>
     <div class="char-count"><span id="char-count">0</span> znaków</div>
@@ -709,7 +709,7 @@ document.getElementById('ai-analyze-btn').addEventListener('click', async () => 
 });
 
 // ─── Caption ──────────────────────────────────────────────────────────────────
-document.getElementById('caption-text').addEventListener('input', updateCharCount);
+document.getElementById('caption-text').addEventListener('input', () => { updateCharCount(); updatePublishButton(); });
 function updateCharCount() {
   const len = document.getElementById('caption-text').value.length;
   document.getElementById('char-count').textContent = len;
@@ -763,7 +763,7 @@ document.querySelectorAll('.platform-card').forEach(card => {
 function updatePublishButton() {
   const hasCaption   = document.getElementById('caption-text').value.trim().length > 0;
   const hasPlatforms = selectedPlatforms.size > 0;
-  document.getElementById('publish-btn').disabled = !(hasCaption && hasPlatforms && currentFile);
+  document.getElementById('publish-btn').disabled = !(hasCaption && hasPlatforms);
 }
 
 // ─── Connect Meta ─────────────────────────────────────────────────────────────
