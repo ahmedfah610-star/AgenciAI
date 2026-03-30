@@ -883,7 +883,7 @@ async function disconnectTikTok(ev) {
 
 // ─── Publish ──────────────────────────────────────────────────────────────────
 document.getElementById('publish-btn').addEventListener('click', async () => {
-  if (!currentFile || selectedPlatforms.size === 0) return;
+  if (selectedPlatforms.size === 0) return;
 
   const publishBtn = document.getElementById('publish-btn');
   publishBtn.disabled = true;
