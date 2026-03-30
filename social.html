@@ -501,9 +501,19 @@ nav {
   <!-- ═══ UPLOAD ═══ -->
   <div class="card">
     <div class="card-title">📎 Media</div>
+    
+    <div style="display:flex; gap:16px; margin-bottom:16px; flex-wrap:wrap;">
+      <label style="cursor:pointer; display:flex; align-items:center; gap:6px; font-size:14px; font-weight:500; color:var(--text);">
+        <input type="radio" name="post_type" value="image" checked> 🖼️ Zwykły Post (Zdjęcie/Grafika)
+      </label>
+      <label style="cursor:pointer; display:flex; align-items:center; gap:6px; font-size:14px; font-weight:500; color:var(--text);">
+        <input type="radio" name="post_type" value="video"> 🎬 Krótkie Wideo (TikTok/Reels)
+      </label>
+    </div>
+
     <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
       <div class="upload-icon">📷</div>
-      <div class="upload-text">Przeciągnij zdjęcie lub wideo</div>
+      <div class="upload-text">Przeciągnij zdjęcie lub wideo (opcjonalnie)</div>
       <div class="upload-hint">lub kliknij, żeby wybrać plik • JPG, PNG, MP4, MOV</div>
     </div>
     <input type="file" id="file-input" class="upload-input" accept="image/*,video/*">
@@ -646,32 +656,41 @@ function handleFile(file) {
     badge.textContent = '🖼️ Zdjęcie';
   }
 
-  document.getElementById('ai-analyze-btn').disabled = false;
+  updateAIBtn();
 }
 
 document.getElementById('media-remove').addEventListener('click', () => {
   currentFile = null;
   document.getElementById('media-preview').style.display = 'none';
   uploadZone.classList.remove('has-file');
-  uploadZone.querySelector('.upload-text').textContent = 'Przeciągnij zdjęcie lub wideo';
+  uploadZone.querySelector('.upload-text').textContent = 'Przeciągnij zdjęcie lub wideo (opcjonalnie)';
   uploadZone.querySelector('.upload-hint').textContent = 'lub kliknij, żeby wybrać plik • JPG, PNG, MP4, MOV';
-  document.getElementById('ai-analyze-btn').disabled = true;
   fileInput.value = '';
+  updateAIBtn();
 });
+
+function updateAIBtn() {
+  const hasFile = !!currentFile;
+  const hasTopic = document.getElementById('topic-input').value.trim().length > 0;
+  document.getElementById('ai-analyze-btn').disabled = !(hasFile || hasTopic);
+}
+
+document.getElementById('topic-input').addEventListener('input', updateAIBtn);
 
 // ─── AI Analyze ───────────────────────────────────────────────────────────────
 document.getElementById('ai-analyze-btn').addEventListener('click', async () => {
-  if (!currentFile) return;
+  if (!currentFile && document.getElementById('topic-input').value.trim().length === 0) return;
 
   const btn = document.getElementById('ai-analyze-btn');
   btn.disabled = true;
   btn.textContent = '⏳ Analizuję…';
-  setStatus('loading', '✨ AI analizuje Twoje media…');
+  setStatus('loading', '✨ AI generuje treść…');
 
   const formData = new FormData();
-  formData.append('media', currentFile);
+  if (currentFile) formData.append('media', currentFile);
   formData.append('topic', document.getElementById('topic-input').value.trim());
   formData.append('platform', 'all');
+  formData.append('post_type', document.querySelector('input[name="post_type"]:checked').value);
 
   try {
     const resp = await fetch('/api/social/analyze', { method: 'POST', body: formData, credentials: 'include' });

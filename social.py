@@ -98,31 +98,33 @@ def social_analyze():
     """Analyze uploaded image/video and generate social media caption + hashtags."""
     logger = _get_app_logger()
 
-    media_file = request.files.get("media")
-    topic      = request.form.get("topic", "").strip()
-    platform   = request.form.get("platform", "all").strip()  # hint for style
+    media_file  = request.files.get("media")
+    topic       = request.form.get("topic", "").strip()
+    platform    = request.form.get("platform", "all").strip()
+    post_type   = request.form.get("post_type", "image").strip() # "image" or "video"
 
-    if not media_file:
-        return jsonify({"error": "Brak pliku media"}), 400
+    if not media_file and not topic:
+        return jsonify({"error": "Wgraj zdjęcie/wideo lub wpisz temat posta, aby AI mogło wygenerować opis."}), 400
 
-    filename  = media_file.filename or ""
-    mime_type = media_file.content_type or ""
-    raw_data  = media_file.read()
+    filename  = media_file.filename if media_file else ""
+    mime_type = media_file.content_type if media_file else ""
+    raw_data  = media_file.read() if media_file else b""
 
-    is_video = mime_type.startswith("video/") or filename.lower().endswith(
-        (".mp4", ".mov", ".avi", ".mkv", ".webm")
-    )
-    is_image = mime_type.startswith("image/") or filename.lower().endswith(
-        (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp")
-    )
+    # Use explicit post_type, but fallback to file extension if available
+    is_video = (post_type == "video")
+    if media_file and not is_video:
+        is_video = mime_type.startswith("video/") or filename.lower().endswith((".mp4", ".mov", ".avi", ".mkv", ".webm"))
+        if is_video: post_type = "video"
 
-    if not is_video and not is_image:
+    is_image = not is_video
+
+    if media_file and not is_video and not mime_type.startswith("image/") and not filename.lower().endswith((".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp")):
         return jsonify({"error": "Nieobsługiwany format pliku. Wyślij zdjęcie lub wideo."}), 400
 
     # Build Claude prompt
     topic_hint = ""
     if topic:
-        topic_hint = f'\n\nDodatkowy kontekst od użytkownika: "{topic}". Użyj tego do lepszego zrozumienia produktu/treści.'
+        topic_hint = f'\n\nDodatkowy kontekst/temat od użytkownika: "{topic}". Użyj tego jako głównej wskazówki do treści.'
 
     platform_hint = ""
     if platform and platform != "all":
@@ -130,7 +132,7 @@ def social_analyze():
 
     content_parts = []
 
-    if is_image:
+    if media_file and is_image:
         # Convert to appropriate MIME for Claude
         claude_mime = mime_type
         if claude_mime not in ("image/jpeg", "image/png", "image/webp", "image/gif"):
@@ -142,12 +144,29 @@ def social_analyze():
             "source": {"type": "base64", "media_type": claude_mime, "data": image_b64},
         })
         media_instruction = "Analizujesz ZDJĘCIE do posta na social media."
+    elif is_image:
+        media_instruction = "Tworzysz treść do zwykłego POSTA (ZDJĘCIE) na bazie samego tematu (brak wgranego pliku)."
     else:
-        # For video: we can't send video to Claude directly, so we describe context
-        media_instruction = (
-            "Użytkownik chce opublikować WIDEO na social media. "
-            "Nie widzisz wideo, ale na podstawie kontekstu podanego przez użytkownika, "
-            "wygeneruj angażujący opis i hashtagi."
+        # For video
+        media_instruction = "Tworzysz KRÓTKI opis do WIDEO (TikTok/Reels/Shorts). Opis ma być zwięzły, szybko łapiący uwagę."
+
+    if is_video:
+        prompt_rules = (
+            "Zasady dla wideo:\n"
+            "- Opis (caption) musi być BARDZO KRÓTKI (1-2 zdania max).\n"
+            "- Skup się na haczyku (hook) i dynamicznym tonie.\n"
+            "- Hashtagi bez znaku # (sam tekst)\n"
+            "- 5-10 hashtagów.\n"
+            "- Dodaj emoji strategicznie."
+        )
+    else:
+        prompt_rules = (
+            "Zasady dla posta ze zdjęciem:\n"
+            "- Opis (caption) ma pomóc w sprzedaży/zaangażowaniu (3-5 zdań).\n"
+            "- Hashtagi bez znaku # (sam tekst)\n"
+            "- 5-15 hashtagów, mix popularnych i niche\n"
+            "- Dodaj emoji strategicznie\n"
+            "- Jeśli widzisz zdjęcie/temat produktu — opisz go atrakcyjnie"
         )
 
     content_parts.append({
@@ -158,19 +177,12 @@ def social_analyze():
             "Twórz treści, które generują zaangażowanie.\n\n"
             "Wygeneruj TYLKO prawidłowy JSON (bez markdown, bez preambuły):\n"
             "{\n"
-            '  "caption": "Angażujący opis posta po polsku (2-4 zdania, z emoji). '
-            'Powinien wzbudzać ciekawość i zachęcać do interakcji.",\n'
+            '  "caption": "Opis posta po polsku",\n'
             '  "hashtags": ["hashtag1", "hashtag2", ...],\n'
-            '  "media_type": "image" lub "video",\n'
-            '  "suggested_cta": "Sugerowane call-to-action (np. Kliknij link w bio!)"\n'
+            '  "media_type": "' + post_type + '",\n'
+            '  "suggested_cta": "Sugerowane call-to-action (np. Zostaw komentarz!)"\n'
             "}\n\n"
-            "Zasady:\n"
-            "- Hashtagi bez znaku # (sam tekst)\n"
-            "- 5-15 hashtagów, mix popularnych i niche\n"
-            "- Caption ma być naturalny, nie reklamowy\n"
-            "- Dodaj emoji strategicznie\n"
-            "- Jeśli widzisz produkt — opisz go atrakcyjnie\n"
-            "- Sugeruj CTA dopasowane do treści"
+            f"{prompt_rules}"
         ),
     })
 
