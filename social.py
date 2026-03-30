@@ -265,10 +265,14 @@ def meta_auth_start():
 
 @social_bp.route("/api/social/meta/auth/callback")
 def meta_auth_callback():
+    logger = _get_app_logger()
+    logger.info("Meta callback received. All args: %s", dict(request.args))
+    
     code  = request.args.get("code")
     error = request.args.get("error")
+    error_reason = request.args.get("error_reason", "")
+    error_desc   = request.args.get("error_description", "")
     state = request.args.get("state", "")
-    logger = _get_app_logger()
 
     def _html_close(status: str, msg: str) -> str:
         return f"""<!DOCTYPE html><html><head><meta charset="UTF-8">
@@ -281,9 +285,11 @@ def meta_auth_callback():
         setTimeout(()=>window.close(),2000);</script></body></html>"""
 
     if error:
-        return _html_close("error", f"Błąd: {error}"), 400
+        return _html_close("error", f"Błąd: {error} | {error_reason} | {error_desc}"), 400
+
     if not code:
-        return _html_close("error", "Brak kodu autoryzacyjnego."), 400
+        all_params = ', '.join(f'{k}={v[:50]}' for k,v in request.args.items())
+        return _html_close("error", f"Brak kodu. Params: {all_params}"), 400
 
     # Decode user from state
     try:
