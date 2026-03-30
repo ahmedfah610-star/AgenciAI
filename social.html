@@ -504,10 +504,10 @@ nav {
     
     <div style="display:flex; gap:16px; margin-bottom:16px; flex-wrap:wrap;">
       <label style="cursor:pointer; display:flex; align-items:center; gap:6px; font-size:14px; font-weight:500; color:var(--text);">
-        <input type="radio" name="post_type" value="image" checked> 🖼️ Zwykły Post (Zdjęcie/Grafika)
+        <input type="radio" name="post_type" value="image" checked onchange="handlePostTypeChange()"> 🖼️ Zwykły Post (Zdjęcie/Grafika)
       </label>
       <label style="cursor:pointer; display:flex; align-items:center; gap:6px; font-size:14px; font-weight:500; color:var(--text);">
-        <input type="radio" name="post_type" value="video"> 🎬 Krótkie Wideo (TikTok/Reels)
+        <input type="radio" name="post_type" value="video" onchange="handlePostTypeChange()"> 🎬 Krótkie Wideo (TikTok/Reels)
       </label>
     </div>
 
@@ -573,6 +573,7 @@ nav {
         <div class="platform-icon">🎵</div>
         <div class="platform-name">TikTok</div>
         <div class="platform-status status-disconnected" id="status-tiktok">Niepodłączony</div>
+        <div id="tk-hint" style="font-size:10px; color:var(--muted); margin-top:4px;">(Dostępny tylko dla wideo)</div>
       </div>
     </div>
 
@@ -673,6 +674,32 @@ function updateAIBtn() {
   const hasFile = !!currentFile;
   const hasTopic = document.getElementById('topic-input').value.trim().length > 0;
   document.getElementById('ai-analyze-btn').disabled = !(hasFile || hasTopic);
+}
+
+function handlePostTypeChange() {
+  updateAIBtn();
+  
+  const postType = document.querySelector('input[name="post_type"]:checked').value;
+  const tkCard = document.getElementById('pc-tiktok');
+  
+  if (postType === 'image') {
+    tkCard.classList.add('disabled');
+    tkCard.querySelector('#tk-hint').style.color = 'var(--red)';
+    if (selectedPlatforms.has('tiktok')) {
+      selectedPlatforms.delete('tiktok');
+      tkCard.classList.remove('selected');
+      tkCard.querySelector('.platform-check').textContent = '';
+      updatePublishButton();
+    }
+  } else {
+    tkCard.querySelector('#tk-hint').style.color = 'var(--muted)';
+    // Restore original status logic for TikTok
+    if (!platformStatuses.tiktok?.configured) {
+      tkCard.classList.add('disabled');
+    } else {
+      tkCard.classList.remove('disabled');
+    }
+  }
 }
 
 document.getElementById('topic-input').addEventListener('input', updateAIBtn);
@@ -862,16 +889,16 @@ async function loadPlatformStatuses() {
     if (platformStatuses.tiktok?.connected) {
       tkStatus.className = 'platform-status status-connected';
       tkStatus.textContent = '✓ Połączony';
-      tkCard.classList.remove('disabled');
     } else if (!platformStatuses.tiktok?.configured) {
       tkStatus.className = 'platform-status status-unconfigured';
       tkStatus.textContent = 'Brak kluczy API';
-      tkCard.classList.add('disabled');
     } else {
       tkStatus.className = 'platform-status status-disconnected';
       tkStatus.textContent = 'Niepodłączony';
-      tkCard.classList.remove('disabled');
     }
+
+    // Call this to set the proper disabled state of the TikTok card based on current post_type
+    handlePostTypeChange();
 
     // Update connect buttons
     const metaBtn = document.getElementById('connect-meta-btn');
