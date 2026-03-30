@@ -759,12 +759,7 @@
     <div class="panel">
       <div class="panel-title">Wygenerowany produkt</div>
 
-      <div class="empty-state" id="empty-state">
-        <div class="big-icon">🪄</div>
-        <p>Dodaj zdjęcia i kliknij Analizuj — AI wykryje cechy produktu i wygeneruje listing</p>
-      </div>
-
-      <div class="product-form" id="product-form">
+      <div class="product-form visible" id="product-form">
 
         <!-- ── Podstawowe ── -->
         <div class="section-divider">Podstawowe informacje</div>
@@ -1218,7 +1213,6 @@ analyzeBtn.addEventListener('click', async () => {
   analyzeBtn.disabled = true;
   document.getElementById('analyze-text').textContent = 'Analizuję…';
   setStatus('loading', '🔍 Wysyłam do modelu wizyjnego…');
-  hideProduct();
 
   const formData = new FormData();
   currentFiles.forEach(f => formData.append('images', f));
@@ -1245,8 +1239,6 @@ analyzeBtn.addEventListener('click', async () => {
       topicInput.value = data.suggested_topic;
     }
     populateForm(data.product);
-    document.getElementById('empty-state').style.display = 'none';
-    document.getElementById('product-form').classList.add('visible');
     setStatus('success', '✓ Produkt wygenerowany — sprawdź i opublikuj poniżej');
 
     // Auto-suggest VAT rates from Allegro category (non-blocking)
@@ -1285,8 +1277,7 @@ function populateForm(product) {
 }
 
 function hideProduct() {
-  document.getElementById('product-form').classList.remove('visible');
-  document.getElementById('empty-state').style.display = '';
+  // Nie ukrywamy formularza wg życzenia użytkownika
 }
 
 // ─── SEO counters & preview ───────────────────────────────────────────────────
