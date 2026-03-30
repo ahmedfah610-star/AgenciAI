@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bizAgent — Social Media Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #ffffff;
+  --bg2: #f5f5f7;
+  --bg3: #fbfbfd;
+  --text: #1d1d1f;
+  --text2: #6e6e73;
+  --text3: #a1a1a6;
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --purple: #af52de;
+  --purple-hover: #9b3dc8;
+  --green: #34c759;
+  --red: #ff3b30;
+  --orange: #ff9500;
+  --border: #d2d2d7;
+  --border-light: #e8e8ed;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg3);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* NAV */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  height: 52px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 22px;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+.logo { font-size: 19px; font-weight: 600; color: var(--text); text-decoration: none; letter-spacing: -0.3px; }
+.logo span { color: var(--purple); }
+.nav-right { display: flex; align-items: center; gap: 12px; }
+.nav-link { font-size: 13px; color: var(--text2); text-decoration: none; transition: color .15s; }
+.nav-link:hover { color: var(--text); }
+.nav-back { display: flex; align-items: center; gap: 4px; }
+
+/* MAIN LAYOUT */
+.main-container {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 76px 24px 60px;
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+.page-header h1 {
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -1px;
+  margin-bottom: 8px;
+}
+.page-header h1 em {
+  font-style: normal;
+  background: linear-gradient(90deg, var(--purple), #ff6b9d);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.page-header p {
+  font-size: 16px;
+  color: var(--text2);
+  font-weight: 300;
+}
+
+/* CARDS */
+.card {
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: 16px;
+  padding: 32px;
+  margin-bottom: 20px;
+  transition: box-shadow .2s;
+}
+.card:hover { box-shadow: 0 2px 20px rgba(0,0,0,0.04); }
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* UPLOAD ZONE */
+.upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: 14px;
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+  background: var(--bg3);
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: var(--purple);
+  background: rgba(175,82,222,0.03);
+}
+.upload-zone.has-file {
+  border-style: solid;
+  border-color: var(--green);
+  background: rgba(52,199,89,0.03);
+}
+.upload-icon { font-size: 40px; margin-bottom: 12px; }
+.upload-text { font-size: 16px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+.upload-hint { font-size: 13px; color: var(--text3); }
+.upload-input { display: none; }
+
+/* MEDIA PREVIEW */
+.media-preview {
+  display: none;
+  margin-top: 20px;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  background: #000;
+  max-height: 400px;
+}
+.media-preview img, .media-preview video {
+  width: 100%;
+  max-height: 400px;
+  object-fit: contain;
+  display: block;
+}
+.media-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.media-remove {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(255,59,48,0.85);
+  color: #fff;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .15s;
+}
+.media-remove:hover { background: var(--red); transform: scale(1.1); }
+
+/* TOPIC INPUT */
+.topic-row {
+  margin-top: 16px;
+}
+.topic-row label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text2);
+  margin-bottom: 6px;
+}
+.topic-row input {
+  width: 100%;
+  padding: 11px 16px;
+  border: 1.5px solid var(--border-light);
+  border-radius: 10px;
+  font-family: var(--font);
+  font-size: 15px;
+  color: var(--text);
+  background: var(--bg);
+  outline: none;
+  transition: border-color .15s;
+}
+.topic-row input:focus { border-color: var(--purple); }
+
+/* AI BUTTON */
+.ai-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, var(--purple), #e040fb);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all .2s;
+}
+.ai-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(175,82,222,0.35); }
+.ai-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* CAPTION AREA */
+.caption-area {
+  display: none;
+}
+.caption-area.visible { display: block; }
+
+.caption-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--border-light);
+  border-radius: 12px;
+  font-family: var(--font);
+  font-size: 15px;
+  color: var(--text);
+  background: var(--bg);
+  outline: none;
+  resize: vertical;
+  line-height: 1.6;
+  transition: border-color .15s;
+}
+.caption-textarea:focus { border-color: var(--purple); }
+
+.char-count {
+  text-align: right;
+  font-size: 12px;
+  color: var(--text3);
+  margin-top: 4px;
+}
+
+/* HASHTAGS */
+.hashtags-container {
+  margin-top: 16px;
+}
+.hashtags-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text2);
+  margin-bottom: 8px;
+}
+.hashtags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hashtag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  background: rgba(175,82,222,0.08);
+  color: var(--purple);
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.hashtag-remove {
+  background: none;
+  border: none;
+  color: var(--purple);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+  opacity: .6;
+  transition: opacity .15s;
+}
+.hashtag-remove:hover { opacity: 1; }
+
+.hashtag-input {
+  border: 1px dashed var(--border);
+  background: none;
+  border-radius: 100px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-family: var(--font);
+  color: var(--text);
+  outline: none;
+  width: 120px;
+}
+.hashtag-input::placeholder { color: var(--text3); }
+
+/* CTA SUGGESTION */
+.cta-row {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: rgba(255,149,0,0.06);
+  border: 1px solid rgba(255,149,0,0.15);
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--text);
+  display: none;
+}
+.cta-row.visible { display: block; }
+.cta-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--orange);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+/* PLATFORMS */
+.platforms-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.platform-card {
+  border: 1.5px solid var(--border-light);
+  border-radius: 12px;
+  padding: 20px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+  position: relative;
+}
+.platform-card.selected {
+  border-color: var(--purple);
+  background: rgba(175,82,222,0.03);
+}
+.platform-card.disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+.platform-card:not(.disabled):hover {
+  border-color: var(--border);
+  background: var(--bg3);
+}
+
+.platform-icon { font-size: 28px; margin-bottom: 8px; }
+.platform-name { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.platform-status {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 100px;
+  display: inline-block;
+}
+.status-connected { background: rgba(52,199,89,0.1); color: var(--green); }
+.status-disconnected { background: rgba(255,59,48,0.08); color: var(--red); }
+.status-unconfigured { background: var(--bg2); color: var(--text3); }
+
+.platform-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: all .15s;
+}
+.platform-card.selected .platform-check {
+  background: var(--purple);
+  border-color: var(--purple);
+  color: #fff;
+}
+
+/* CONNECT BUTTONS */
+.connect-section { margin-top: 20px; }
+.connect-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border: 1.5px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all .15s;
+  margin-right: 8px;
+  margin-bottom: 8px;
+}
+.connect-btn:hover { border-color: var(--border); background: var(--bg2); }
+.connect-btn.connected { border-color: var(--green); color: var(--green); }
+.disconnect-btn {
+  background: none;
+  border: none;
+  color: var(--red);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: var(--font);
+  margin-left: 4px;
+  text-decoration: underline;
+}
+
+/* PUBLISH BUTTON */
+.publish-btn {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, var(--purple), #e040fb);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all .2s;
+  letter-spacing: -0.3px;
+}
+.publish-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(175,82,222,0.4);
+}
+.publish-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* RESULTS */
+.results-card { display: none; }
+.results-card.visible { display: block; }
+.result-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+.result-row:last-child { border: none; }
+.result-icon { font-size: 24px; }
+.result-name { font-size: 15px; font-weight: 500; flex: 1; }
+.result-status-ok { color: var(--green); font-weight: 500; font-size: 14px; }
+.result-status-err { color: var(--red); font-size: 13px; max-width: 400px; }
+
+/* STATUS BAR */
+.status-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 24px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 100;
+  display: none;
+  transition: all .3s;
+}
+.status-bar.loading { display: block; background: rgba(175,82,222,0.1); color: var(--purple); }
+.status-bar.success { display: block; background: rgba(52,199,89,0.1); color: var(--green); }
+.status-bar.error { display: block; background: rgba(255,59,48,0.1); color: var(--red); }
+
+@media (max-width: 640px) {
+  .platforms-grid { grid-template-columns: 1fr; }
+  .main-container { padding: 68px 16px 50px; }
+  .card { padding: 24px 20px; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/dashboard" class="logo">biz<span>Agent</span></a>
+  <div class="nav-right">
+    <a href="/dashboard" class="nav-link nav-back">← Panel</a>
+    <a href="/app" class="nav-link">Agent sprzedaży</a>
+  </div>
+</nav>
+
+<div class="main-container">
+
+  <div class="page-header">
+    <h1>Social Media <em>Agent</em></h1>
+    <p>Wgraj zdjęcie lub wideo — AI napisze angażujący post. Opublikuj jednym kliknięciem.</p>
+  </div>
+
+  <!-- ═══ UPLOAD ═══ -->
+  <div class="card">
+    <div class="card-title">📎 Media</div>
+    <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+      <div class="upload-icon">📷</div>
+      <div class="upload-text">Przeciągnij zdjęcie lub wideo</div>
+      <div class="upload-hint">lub kliknij, żeby wybrać plik • JPG, PNG, MP4, MOV</div>
+    </div>
+    <input type="file" id="file-input" class="upload-input" accept="image/*,video/*">
+
+    <div class="media-preview" id="media-preview">
+      <span class="media-badge" id="media-badge">🖼️ Zdjęcie</span>
+      <button class="media-remove" id="media-remove" title="Usuń">✕</button>
+      <img id="preview-img" style="display:none;">
+      <video id="preview-video" controls style="display:none;"></video>
+    </div>
+
+    <div class="topic-row">
+      <label for="topic-input">Kontekst / temat (opcjonalne)</label>
+      <input type="text" id="topic-input" placeholder="np. Nowa kolekcja wiosenna, Promocja -30%...">
+    </div>
+
+    <button class="ai-btn" id="ai-analyze-btn" disabled>
+      ✨ Wygeneruj opis AI
+    </button>
+  </div>
+
+  <!-- ═══ CAPTION ═══ -->
+  <div class="card caption-area" id="caption-card">
+    <div class="card-title">✏️ Opis posta</div>
+    <textarea class="caption-textarea" id="caption-text" placeholder="Twój opis pojawi się tutaj..."></textarea>
+    <div class="char-count"><span id="char-count">0</span> znaków</div>
+
+    <div class="hashtags-container">
+      <div class="hashtags-label"># Hashtagi</div>
+      <div class="hashtags-list" id="hashtags-list"></div>
+    </div>
+
+    <div class="cta-row" id="cta-row">
+      <div class="cta-label">💡 Sugerowane CTA</div>
+      <span id="cta-text"></span>
+    </div>
+  </div>
+
+  <!-- ═══ PLATFORMS ═══ -->
+  <div class="card">
+    <div class="card-title">📱 Platformy</div>
+    <div class="platforms-grid" id="platforms-grid">
+      <div class="platform-card" data-platform="facebook" id="pc-facebook">
+        <div class="platform-check" id="check-facebook"></div>
+        <div class="platform-icon">📘</div>
+        <div class="platform-name">Facebook</div>
+        <div class="platform-status status-disconnected" id="status-facebook">Niepodłączony</div>
+      </div>
+      <div class="platform-card" data-platform="instagram" id="pc-instagram">
+        <div class="platform-check" id="check-instagram"></div>
+        <div class="platform-icon">📸</div>
+        <div class="platform-name">Instagram</div>
+        <div class="platform-status status-disconnected" id="status-instagram">Niepodłączony</div>
+      </div>
+      <div class="platform-card" data-platform="tiktok" id="pc-tiktok">
+        <div class="platform-check" id="check-tiktok"></div>
+        <div class="platform-icon">🎵</div>
+        <div class="platform-name">TikTok</div>
+        <div class="platform-status status-disconnected" id="status-tiktok">Niepodłączony</div>
+      </div>
+    </div>
+
+    <div class="connect-section">
+      <button class="connect-btn" id="connect-meta-btn" onclick="connectMeta()">
+        🔗 Podłącz Facebook / Instagram
+      </button>
+      <button class="connect-btn" id="connect-tiktok-btn" onclick="connectTikTok()">
+        🔗 Podłącz TikTok
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ PUBLISH ═══ -->
+  <button class="publish-btn" id="publish-btn" disabled>
+    🚀 Opublikuj na wybranych platformach
+  </button>
+
+  <!-- ═══ RESULTS ═══ -->
+  <div class="card results-card" id="results-card">
+    <div class="card-title">📊 Wyniki publikacji</div>
+    <div id="results-container"></div>
+  </div>
+
+</div>
+
+<div class="status-bar" id="status-bar">
+  <span id="status-text"></span>
+</div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+let currentFile = null;
+let currentMediaType = 'image';
+let currentHashtags = [];
+let selectedPlatforms = new Set();
+let platformStatuses = {};
+
+// ─── Upload Zone ──────────────────────────────────────────────────────────────
+const uploadZone = document.getElementById('upload-zone');
+const fileInput  = document.getElementById('file-input');
+
+['dragenter', 'dragover'].forEach(e => {
+  uploadZone.addEventListener(e, ev => { ev.preventDefault(); uploadZone.classList.add('dragover'); });
+});
+['dragleave', 'drop'].forEach(e => {
+  uploadZone.addEventListener(e, ev => { ev.preventDefault(); uploadZone.classList.remove('dragover'); });
+});
+uploadZone.addEventListener('drop', ev => {
+  const file = ev.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) handleFile(fileInput.files[0]);
+});
+
+function handleFile(file) {
+  currentFile = file;
+  const isVideo = file.type.startsWith('video/');
+  currentMediaType = isVideo ? 'video' : 'image';
+
+  const preview    = document.getElementById('media-preview');
+  const previewImg = document.getElementById('preview-img');
+  const previewVid = document.getElementById('preview-video');
+  const badge      = document.getElementById('media-badge');
+
+  preview.style.display = 'block';
+  uploadZone.classList.add('has-file');
+  uploadZone.querySelector('.upload-text').textContent = file.name;
+  uploadZone.querySelector('.upload-hint').textContent = `${(file.size / 1024 / 1024).toFixed(1)} MB • ${isVideo ? 'Wideo' : 'Zdjęcie'}`;
+
+  if (isVideo) {
+    previewImg.style.display = 'none';
+    previewVid.style.display = 'block';
+    previewVid.src = URL.createObjectURL(file);
+    badge.textContent = '🎬 Wideo';
+  } else {
+    previewVid.style.display = 'none';
+    previewImg.style.display = 'block';
+    previewImg.src = URL.createObjectURL(file);
+    badge.textContent = '🖼️ Zdjęcie';
+  }
+
+  document.getElementById('ai-analyze-btn').disabled = false;
+}
+
+document.getElementById('media-remove').addEventListener('click', () => {
+  currentFile = null;
+  document.getElementById('media-preview').style.display = 'none';
+  uploadZone.classList.remove('has-file');
+  uploadZone.querySelector('.upload-text').textContent = 'Przeciągnij zdjęcie lub wideo';
+  uploadZone.querySelector('.upload-hint').textContent = 'lub kliknij, żeby wybrać plik • JPG, PNG, MP4, MOV';
+  document.getElementById('ai-analyze-btn').disabled = true;
+  fileInput.value = '';
+});
+
+// ─── AI Analyze ───────────────────────────────────────────────────────────────
+document.getElementById('ai-analyze-btn').addEventListener('click', async () => {
+  if (!currentFile) return;
+
+  const btn = document.getElementById('ai-analyze-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Analizuję…';
+  setStatus('loading', '✨ AI analizuje Twoje media…');
+
+  const formData = new FormData();
+  formData.append('media', currentFile);
+  formData.append('topic', document.getElementById('topic-input').value.trim());
+  formData.append('platform', 'all');
+
+  try {
+    const resp = await fetch('/api/social/analyze', { method: 'POST', body: formData, credentials: 'include' });
+    const data = await resp.json();
+
+    if (data.error) throw new Error(data.error);
+
+    // Fill caption
+    const captionCard = document.getElementById('caption-card');
+    const captionText = document.getElementById('caption-text');
+    captionCard.classList.add('visible');
+    captionText.value = data.caption || '';
+    updateCharCount();
+
+    // Fill hashtags
+    currentHashtags = data.hashtags || [];
+    renderHashtags();
+
+    // CTA
+    if (data.suggested_cta) {
+      const ctaRow = document.getElementById('cta-row');
+      ctaRow.classList.add('visible');
+      document.getElementById('cta-text').textContent = data.suggested_cta;
+    }
+
+    setStatus('success', '✓ Opis wygenerowany przez AI!');
+    updatePublishButton();
+
+  } catch (err) {
+    setStatus('error', '✗ ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✨ Wygeneruj opis AI';
+  }
+});
+
+// ─── Caption ──────────────────────────────────────────────────────────────────
+document.getElementById('caption-text').addEventListener('input', updateCharCount);
+function updateCharCount() {
+  const len = document.getElementById('caption-text').value.length;
+  document.getElementById('char-count').textContent = len;
+}
+
+// ─── Hashtags ─────────────────────────────────────────────────────────────────
+function renderHashtags() {
+  const list = document.getElementById('hashtags-list');
+  list.innerHTML = '';
+  currentHashtags.forEach((tag, i) => {
+    const el = document.createElement('span');
+    el.className = 'hashtag';
+    el.innerHTML = `#${tag} <button class="hashtag-remove" onclick="removeHashtag(${i})">✕</button>`;
+    list.appendChild(el);
+  });
+  // Add input for new hashtag
+  const input = document.createElement('input');
+  input.className = 'hashtag-input';
+  input.placeholder = '+ dodaj';
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && input.value.trim()) {
+      currentHashtags.push(input.value.trim().replace(/^#/, ''));
+      renderHashtags();
+    }
+  });
+  list.appendChild(input);
+}
+
+function removeHashtag(idx) {
+  currentHashtags.splice(idx, 1);
+  renderHashtags();
+}
+
+// ─── Platforms ────────────────────────────────────────────────────────────────
+document.querySelectorAll('.platform-card').forEach(card => {
+  card.addEventListener('click', () => {
+    if (card.classList.contains('disabled')) return;
+    const platform = card.dataset.platform;
+    if (selectedPlatforms.has(platform)) {
+      selectedPlatforms.delete(platform);
+      card.classList.remove('selected');
+    } else {
+      selectedPlatforms.add(platform);
+      card.classList.add('selected');
+    }
+    card.querySelector('.platform-check').textContent = card.classList.contains('selected') ? '✓' : '';
+    updatePublishButton();
+  });
+});
+
+function updatePublishButton() {
+  const hasCaption   = document.getElementById('caption-text').value.trim().length > 0;
+  const hasPlatforms = selectedPlatforms.size > 0;
+  document.getElementById('publish-btn').disabled = !(hasCaption && hasPlatforms && currentFile);
+}
+
+// ─── Connect Meta ─────────────────────────────────────────────────────────────
+async function connectMeta() {
+  try {
+    const resp = await fetch('/api/social/meta/auth/start', { credentials: 'include' });
+    const data = await resp.json();
+    if (data.error) { alert(data.error); return; }
+    const w = window.open(data.auth_url, 'meta_auth', 'width=600,height=700');
+    window.addEventListener('message', function handler(ev) {
+      if (ev.data && ev.data.metaAuth) {
+        window.removeEventListener('message', handler);
+        loadPlatformStatuses();
+      }
+    });
+  } catch (err) { alert('Błąd: ' + err.message); }
+}
+
+async function connectTikTok() {
+  try {
+    const resp = await fetch('/api/social/tiktok/auth/start', { credentials: 'include' });
+    const data = await resp.json();
+    if (data.error) { alert(data.error); return; }
+    const w = window.open(data.auth_url, 'tiktok_auth', 'width=600,height=700');
+    window.addEventListener('message', function handler(ev) {
+      if (ev.data && ev.data.tiktokAuth) {
+        window.removeEventListener('message', handler);
+        loadPlatformStatuses();
+      }
+    });
+  } catch (err) { alert('Błąd: ' + err.message); }
+}
+
+async function loadPlatformStatuses() {
+  try {
+    const resp = await fetch('/api/social/status', { credentials: 'include' });
+    if (!resp.ok) return;
+    platformStatuses = await resp.json();
+
+    // Facebook
+    const fbStatus = document.getElementById('status-facebook');
+    const fbCard   = document.getElementById('pc-facebook');
+    if (platformStatuses.facebook?.connected) {
+      fbStatus.className = 'platform-status status-connected';
+      fbStatus.textContent = `✓ ${platformStatuses.facebook.page_name || 'Połączony'}`;
+      fbCard.classList.remove('disabled');
+    } else if (!platformStatuses.facebook?.configured) {
+      fbStatus.className = 'platform-status status-unconfigured';
+      fbStatus.textContent = 'Brak kluczy API';
+      fbCard.classList.add('disabled');
+    } else {
+      fbStatus.className = 'platform-status status-disconnected';
+      fbStatus.textContent = 'Niepodłączony';
+      fbCard.classList.remove('disabled');
+    }
+
+    // Instagram
+    const igStatus = document.getElementById('status-instagram');
+    const igCard   = document.getElementById('pc-instagram');
+    if (platformStatuses.instagram?.connected) {
+      igStatus.className = 'platform-status status-connected';
+      igStatus.textContent = '✓ Połączony';
+      igCard.classList.remove('disabled');
+    } else if (!platformStatuses.instagram?.configured) {
+      igStatus.className = 'platform-status status-unconfigured';
+      igStatus.textContent = 'Brak kluczy API';
+      igCard.classList.add('disabled');
+    } else {
+      igStatus.className = 'platform-status status-disconnected';
+      igStatus.textContent = 'Niepodłączony';
+      igCard.classList.remove('disabled');
+    }
+
+    // TikTok
+    const tkStatus = document.getElementById('status-tiktok');
+    const tkCard   = document.getElementById('pc-tiktok');
+    if (platformStatuses.tiktok?.connected) {
+      tkStatus.className = 'platform-status status-connected';
+      tkStatus.textContent = '✓ Połączony';
+      tkCard.classList.remove('disabled');
+    } else if (!platformStatuses.tiktok?.configured) {
+      tkStatus.className = 'platform-status status-unconfigured';
+      tkStatus.textContent = 'Brak kluczy API';
+      tkCard.classList.add('disabled');
+    } else {
+      tkStatus.className = 'platform-status status-disconnected';
+      tkStatus.textContent = 'Niepodłączony';
+      tkCard.classList.remove('disabled');
+    }
+
+    // Update connect buttons
+    const metaBtn = document.getElementById('connect-meta-btn');
+    if (platformStatuses.facebook?.connected) {
+      metaBtn.classList.add('connected');
+      metaBtn.innerHTML = '✓ Facebook / Instagram podłączone <button class="disconnect-btn" onclick="disconnectMeta(event)">rozłącz</button>';
+    }
+    const tkBtn = document.getElementById('connect-tiktok-btn');
+    if (platformStatuses.tiktok?.connected) {
+      tkBtn.classList.add('connected');
+      tkBtn.innerHTML = '✓ TikTok podłączony <button class="disconnect-btn" onclick="disconnectTikTok(event)">rozłącz</button>';
+    }
+
+  } catch (err) { console.error('Status load error:', err); }
+}
+
+async function disconnectMeta(ev) {
+  ev.stopPropagation();
+  await fetch('/api/social/meta/disconnect', { method: 'POST', credentials: 'include' });
+  location.reload();
+}
+
+async function disconnectTikTok(ev) {
+  ev.stopPropagation();
+  await fetch('/api/social/tiktok/disconnect', { method: 'POST', credentials: 'include' });
+  location.reload();
+}
+
+// ─── Publish ──────────────────────────────────────────────────────────────────
+document.getElementById('publish-btn').addEventListener('click', async () => {
+  if (!currentFile || selectedPlatforms.size === 0) return;
+
+  const publishBtn = document.getElementById('publish-btn');
+  publishBtn.disabled = true;
+  publishBtn.textContent = '⏳ Publikuję…';
+
+  const caption = document.getElementById('caption-text').value.trim();
+  const hashtagsStr = currentHashtags.map(h => '#' + h).join(' ');
+  const fullCaption = caption + (hashtagsStr ? '\n\n' + hashtagsStr : '');
+
+  const platformsList = [...selectedPlatforms].join(', ');
+  setStatus('loading', `⏳ Publikuję na ${platformsList}…`);
+
+  const formData = new FormData();
+  formData.append('media', currentFile);
+  formData.append('caption', fullCaption);
+  formData.append('media_type', currentMediaType);
+  formData.append('platforms', JSON.stringify([...selectedPlatforms]));
+
+  try {
+    const resp = await fetch('/api/social/publish-all', { method: 'POST', body: formData, credentials: 'include' });
+    const data = await resp.json();
+
+    if (!resp.ok && data.error) throw new Error(data.error);
+
+    // Show results
+    const resultsCard = document.getElementById('results-card');
+    const container   = document.getElementById('results-container');
+    resultsCard.classList.add('visible');
+    container.innerHTML = '';
+
+    const iconMap = { facebook: '📘', instagram: '📸', tiktok: '🎵' };
+    const nameMap = { facebook: 'Facebook', instagram: 'Instagram', tiktok: 'TikTok' };
+
+    for (const [platform, result] of Object.entries(data.results || {})) {
+      const row = document.createElement('div');
+      row.className = 'result-row';
+      if (result.success) {
+        row.innerHTML = `
+          <span class="result-icon">${iconMap[platform] || '📱'}</span>
+          <span class="result-name">${nameMap[platform] || platform}</span>
+          <span class="result-status-ok">✓ Opublikowano${result.note ? ' — ' + result.note : ''}</span>`;
+      } else {
+        row.innerHTML = `
+          <span class="result-icon">${iconMap[platform] || '📱'}</span>
+          <span class="result-name">${nameMap[platform] || platform}</span>
+          <span class="result-status-err">✗ ${result.error || 'Błąd'}</span>`;
+      }
+      container.appendChild(row);
+    }
+
+    const anyOk = Object.values(data.results || {}).some(r => r.success);
+    if (anyOk) {
+      setStatus('success', '✓ Opublikowano na wybranych platformach!');
+    } else {
+      setStatus('error', '✗ Wszystkie platformy zwróciły błąd');
+    }
+
+  } catch (err) {
+    setStatus('error', '✗ ' + err.message);
+  } finally {
+    publishBtn.disabled = false;
+    publishBtn.textContent = '🚀 Opublikuj na wybranych platformach';
+  }
+});
+
+// ─── Status bar ───────────────────────────────────────────────────────────────
+function setStatus(type, msg) {
+  const bar  = document.getElementById('status-bar');
+  const text = document.getElementById('status-text');
+  bar.className = 'status-bar';
+  if (!type) { bar.style.display = 'none'; return; }
+  bar.classList.add(type);
+  text.textContent = msg;
+  if (type !== 'loading') {
+    setTimeout(() => { bar.className = 'status-bar'; }, 5000);
+  }
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+loadPlatformStatuses();
+</script>
+</body>
+</html>

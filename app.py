@@ -118,6 +118,21 @@ class AllegroToken(db.Model):
     expires_at     = db.Column(db.Float, default=0.0)
 
 
+class SocialToken(db.Model):
+    __tablename__ = "social_tokens"
+    id            = db.Column(db.Integer, primary_key=True)
+    user_id       = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    platform      = db.Column(db.String(50), nullable=False)  # facebook, instagram, tiktok
+    access_token  = db.Column(db.Text, default="")
+    refresh_token = db.Column(db.Text, default="")
+    page_id       = db.Column(db.String(200), default="")
+    page_name     = db.Column(db.String(200), default="")
+    ig_user_id    = db.Column(db.String(200), default="")
+    expires_at    = db.Column(db.Float, default=0.0)
+
+    __table_args__ = (db.UniqueConstraint('user_id', 'platform', name='uq_user_platform'),)
+
+
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
@@ -1671,6 +1686,11 @@ def dashboard():
 def index():
     return send_from_directory(os.path.dirname(os.path.abspath(__file__)), "index.html")
 
+@app.route("/social")
+@login_required
+def social_page():
+    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), "social.html")
+
 
 @app.route("/health")
 def health():
@@ -1684,6 +1704,9 @@ init_models(db)   # rejestruje modele używając istniejącego db (bez circular 
 
 from chatbot import chatbot_bp
 app.register_blueprint(chatbot_bp)
+
+from social import social_bp
+app.register_blueprint(social_bp)
 
 # ─── Init DB + Run ────────────────────────────────────────────────────────────
 
