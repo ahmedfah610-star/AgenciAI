@@ -426,7 +426,7 @@ def tiktok_auth_start():
     params = urllib.parse.urlencode({
         "client_key":             TIKTOK_CLIENT_KEY,
         "response_type":          "code",
-        "scope":                  "video.publish,video.upload,user.info.basic",
+        "scope":                  "video.upload,user.info.basic",
         "redirect_uri":           TIKTOK_REDIRECT_URI,
         "state":                  state,
         "code_challenge":         code_challenge,
