@@ -249,7 +249,7 @@ def meta_auth_start():
     ).decode()
     session["meta_oauth_state"] = state
 
-    scopes = "pages_show_list,pages_read_engagement,instagram_content_publish,instagram_business_basic"
+    scopes = "pages_show_list,pages_read_engagement,instagram_content_publish"
 
     params = urllib.parse.urlencode({
         "client_id":    META_APP_ID,
