@@ -249,7 +249,7 @@ def meta_auth_start():
     ).decode()
     session["meta_oauth_state"] = state
 
-    scopes = "public_profile,email,pages_show_list,pages_read_engagement"
+    scopes = "public_profile"
 
     params = urllib.parse.urlencode({
         "client_id":    META_APP_ID,
