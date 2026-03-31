@@ -91,6 +91,57 @@ nav {
   text-align: center;
   padding: 120px 24px 100px;
   background: linear-gradient(180deg, #fbfbfd 0%, #ffffff 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* ─── Gradient Orbs ─── */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  z-index: 0;
+  will-change: transform;
+}
+.orb-1 {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(0, 113, 227, 0.18) 0%, transparent 70%);
+  top: -120px;
+  left: -100px;
+  animation: orbDrift1 18s ease-in-out infinite;
+}
+.orb-2 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(175, 82, 222, 0.14) 0%, transparent 70%);
+  top: 60px;
+  right: -80px;
+  animation: orbDrift2 22s ease-in-out infinite;
+}
+.orb-3 {
+  width: 380px;
+  height: 380px;
+  background: radial-gradient(circle, rgba(0, 198, 255, 0.12) 0%, transparent 70%);
+  bottom: 80px;
+  left: 30%;
+  animation: orbDrift3 26s ease-in-out infinite;
+}
+@keyframes orbDrift1 {
+  0%,100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(60px, 40px) scale(1.08); }
+  66%      { transform: translate(-30px, 70px) scale(0.95); }
+}
+@keyframes orbDrift2 {
+  0%,100% { transform: translate(0, 0) scale(1); }
+  40%      { transform: translate(-70px, 60px) scale(1.12); }
+  70%      { transform: translate(40px, -30px) scale(0.92); }
+}
+@keyframes orbDrift3 {
+  0%,100% { transform: translate(0, 0) scale(1); }
+  30%      { transform: translate(50px, -50px) scale(1.06); }
+  65%      { transform: translate(-60px, 30px) scale(0.97); }
 }
 
 .section-divider {
@@ -185,11 +236,13 @@ nav {
   text-align: left;
   text-decoration: none;
   color: inherit;
-  transition: all 0.25s cubic-bezier(.4,0,.2,1);
+  transition: transform 0.12s ease, box-shadow 0.25s cubic-bezier(.4,0,.2,1), border-color 0.25s;
   overflow: hidden;
   cursor: pointer;
   display: flex;
   flex-direction: column;
+  transform-style: preserve-3d;
+  will-change: transform;
 }
 
 .tool-card::before {
@@ -203,8 +256,7 @@ nav {
 
 .tool-card:hover {
   border-color: transparent;
-  transform: translateY(-4px);
-  box-shadow: 0 12px 48px rgba(0,0,0,0.1), 0 2px 12px rgba(0,0,0,0.06);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.07);
 }
 
 .tool-card.sale::before {
@@ -370,11 +422,16 @@ footer a:hover { color: var(--text); }
 </nav>
 
 <section class="dashboard-hero">
+  <!-- Animated gradient orbs -->
+  <div class="orb orb-1" aria-hidden="true"></div>
+  <div class="orb orb-2" aria-hidden="true"></div>
+  <div class="orb orb-3" aria-hidden="true"></div>
+
   <div class="hero-eyebrow">Twój panel</div>
   <h1>Korzystaj <em>już teraz!</em></h1>
   <p class="hero-sub">Wybierz narzędzie i zacznij automatyzować swoją firmę. Wszystko działa 24/7 — bez Ciebie.</p>
 
-  <div class="tools-grid">
+  <div class="tools-grid" style="position:relative;z-index:1;">
 
     <!-- Narzędzie do sprzedaży -->
     <a href="/app" class="tool-card sale" id="tool-sale">
@@ -532,6 +589,35 @@ footer a:hover { color: var(--text); }
 </footer>
 
 <script>
+// ─── 3D Tilt Effect on tool cards ───
+(function() {
+  const MAX_TILT = 10; // degrees
+  const cards = document.querySelectorAll('.tool-card');
+
+  cards.forEach(card => {
+    card.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      const cx   = rect.left + rect.width  / 2;
+      const cy   = rect.top  + rect.height / 2;
+      const dx   = (e.clientX - cx) / (rect.width  / 2);
+      const dy   = (e.clientY - cy) / (rect.height / 2);
+      const rotX = -dy * MAX_TILT;
+      const rotY =  dx * MAX_TILT;
+      card.style.transform = `perspective(900px) rotateX(${rotX}deg) rotateY(${rotY}deg) translateY(-6px) scale(1.02)`;
+      card.style.transition = 'transform 0.08s ease, box-shadow 0.08s ease';
+    });
+
+    card.addEventListener('mouseleave', () => {
+      card.style.transform = '';
+      card.style.transition = 'transform 0.45s cubic-bezier(.03,.98,.52,.99), box-shadow 0.45s cubic-bezier(.03,.98,.52,.99)';
+    });
+
+    card.addEventListener('mouseenter', () => {
+      card.style.transition = 'transform 0.08s ease';
+    });
+  });
+})();
+
 // Load user info
 fetch('/auth/me', { credentials: 'include' })
   .then(r => {
